@@ -7,10 +7,31 @@ import json
 import uuid
 import database
 import gemini
+import re
 from datetime import datetime
 from dotenv import load_dotenv
 
 load_dotenv()
+
+def safe_float(val, default=0.0) -> float:
+    if val is None:
+        return default
+    if isinstance(val, (int, float)):
+        return float(val)
+    s = str(val).strip().lower()
+    for unit in ["kcal", "calories", "g", "grams", "mg", "ml"]:
+        s = s.replace(unit, "")
+    s = s.strip()
+    try:
+        return float(s)
+    except ValueError:
+        matches = re.findall(r"[-+]?\d*\.\d+|\d+", s)
+        if matches:
+            try:
+                return float(matches[0])
+            except ValueError:
+                pass
+        return default
 
 app = FastAPI(title="AI-Powered Conversational Food Logging Assistant")
 
@@ -60,27 +81,32 @@ def chat(request: ChatRequest, db: Session = Depends(database.get_db)):
     # Extract draft items from analysis response
     draft_items = []
     total_cals = 0
-    for item in analysis.get("items", []):
+    items_list = analysis.get("items", [])
+    if not isinstance(items_list, list):
+        items_list = []
+        
+    for item in items_list:
+        if not isinstance(item, dict):
+            continue
         food_name = item.get("name", "Unknown")
         qty_val = item.get("quantity", 1)
         
-        # Parse quantity value safely
-        parsed_qty = 1.0
-        try:
-            parsed_qty = float(qty_val)
-        except (ValueError, TypeError):
-            pass
+        parsed_qty = safe_float(qty_val, 1.0)
+        cals = safe_float(item.get("calories"), 0.0)
+        prot = safe_float(item.get("protein"), 0.0)
+        carbs = safe_float(item.get("carbs"), 0.0)
+        fats = safe_float(item.get("fats"), 0.0)
 
         draft_items.append({
             "name": food_name,
             "quantity": parsed_qty,
             "unit": item.get("unit"),
-            "calories": float(item.get("calories", 0)),
-            "protein": float(item.get("protein", 0)),
-            "carbs": float(item.get("carbs", 0)),
-            "fats": float(item.get("fats", 0))
+            "calories": cals,
+            "protein": prot,
+            "carbs": carbs,
+            "fats": fats
         })
-        total_cals += float(item.get("calories", 0))
+        total_cals += cals
 
     if not draft_items:
         return {

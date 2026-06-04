@@ -7,10 +7,32 @@ def get_gemini_client():
     api_key = os.getenv("GEMINI_API_KEY")
     return genai.Client(api_key=api_key)
 
-MODEL_NAME = "gemini-2.5-flash"
+MODEL_CANDIDATES = [
+    "gemini-3.5-flash",
+    "gemini-3.1-flash-lite",
+    "gemini-flash-latest",
+    "gemini-2.0-flash",
+    "gemini-2.5-flash"
+]
+
+def generate_content_with_fallback(prompt: str, config: types.GenerateContentConfig) -> str:
+    client = get_gemini_client()
+    last_err = None
+    for model in MODEL_CANDIDATES:
+        try:
+            response = client.models.generate_content(
+                model=model,
+                contents=prompt,
+                config=config,
+            )
+            return response.text
+        except Exception as e:
+            last_err = e
+            print(f"Model {model} failed: {e}. Trying fallback...")
+            continue
+    raise last_err
 
 def detect_intent(message: str) -> dict:
-    client = get_gemini_client()
     prompt = f"""
     You are an intent classifier for a conversational food logging assistant.
     Your task is to classify the user's message into exactly one of these categories:
@@ -23,18 +45,16 @@ def detect_intent(message: str) -> dict:
     {{ "intent": "LOG_FOOD" | "OTHER", "confidence": 0.99 }}
     """
     
-    response = client.models.generate_content(
-        model=MODEL_NAME,
-        contents=prompt,
+    text = generate_content_with_fallback(
+        prompt=prompt,
         config=types.GenerateContentConfig(
             response_mime_type="application/json",
             temperature=0.0,
         ),
     )
-    return json.loads(response.text)
+    return json.loads(text)
 
 def extract_food_items(text: str) -> list:
-    client = get_gemini_client()
     prompt = f"""
     Extract all foods and quantities from the text.
     Input text: "{text}"
@@ -46,18 +66,16 @@ def extract_food_items(text: str) -> list:
     Only extract items mentioned. Do not add any extra fields.
     """
     
-    response = client.models.generate_content(
-        model=MODEL_NAME,
-        contents=prompt,
+    res_text = generate_content_with_fallback(
+        prompt=prompt,
         config=types.GenerateContentConfig(
             response_mime_type="application/json",
             temperature=0.0,
         ),
     )
-    return json.loads(response.text)
+    return json.loads(res_text)
 
 def estimate_nutrition(food_name: str, quantity: str) -> dict:
-    client = get_gemini_client()
     prompt = f"""
     Estimate nutritional parameters for this food item:
     Food: {food_name}
@@ -76,18 +94,16 @@ def estimate_nutrition(food_name: str, quantity: str) -> dict:
     Ensure all nutritional values are numbers.
     """
     
-    response = client.models.generate_content(
-        model=MODEL_NAME,
-        contents=prompt,
+    res_text = generate_content_with_fallback(
+        prompt=prompt,
         config=types.GenerateContentConfig(
             response_mime_type="application/json",
             temperature=0.0,
         ),
     )
-    return json.loads(response.text)
+    return json.loads(res_text)
 
 def analyze_food_message(message: str) -> dict:
-    client = get_gemini_client()
     prompt = f"""
     You are an AI nutrition assistant for a food logging application.
     Your task is to analyze the user's message: "{message}".
@@ -120,13 +136,12 @@ def analyze_food_message(message: str) -> dict:
     Ensure all nutritional values are floats. If intent is OTHER, "items" should be an empty list.
     """
     
-    response = client.models.generate_content(
-        model=MODEL_NAME,
-        contents=prompt,
+    res_text = generate_content_with_fallback(
+        prompt=prompt,
         config=types.GenerateContentConfig(
             response_mime_type="application/json",
             temperature=0.0,
         ),
     )
-    return json.loads(response.text)
+    return json.loads(res_text)
 

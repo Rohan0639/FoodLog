@@ -7,41 +7,44 @@ const PROTEIN_TARGET = 130;
 const CARBS_TARGET = 250;
 const FATS_TARGET = 65;
 
+const getUnitWeightInGrams = (unitStr) => {
+  const u = (unitStr || '').toLowerCase().trim();
+  
+  const direct = {
+    g: 1.0, gram: 1.0, grams: 1.0,
+    kg: 1000.0, kilogram: 1000.0, kilograms: 1000.0,
+    ml: 1.0, millilitre: 1.0, millilitres: 1.0,
+    l: 1000.0, liter: 1000.0, liters: 1000.0, litre: 1000.0, litres: 1000.0,
+    piece: 100.0, pieces: 100.0, item: 100.0, items: 100.0,
+    slice: 40.0, slices: 40.0,
+    cup: 200.0, cups: 200.0,
+    small: 70.0, medium: 100.0, large: 130.0,
+    normal: 100.0, serving: 150.0, servings: 150.0,
+    bowl: 300.0, bowls: 300.0,
+    glass: 250.0, glasses: 250.0,
+    plate: 400.0, plates: 400.0
+  };
+  
+  if (direct[u] !== undefined) return direct[u];
+  
+  if (u.includes('kg') || u.includes('kilogram')) return 1000.0;
+  if (u.includes('ml') || u.includes('millilitre')) return 1.0;
+  if (u.includes('liter') || u.includes('litre') || u.includes(' l')) return 1000.0;
+  if (u.includes('bowl')) return 300.0;
+  if (u.includes('glass')) return 250.0;
+  if (u.includes('cup')) return 200.0;
+  if (u.includes('plate')) return 400.0;
+  if (u.includes('slice')) return 40.0;
+  if (u.includes('large')) return 130.0;
+  if (u.includes('small')) return 70.0;
+  
+  return 100.0;
+};
+
 const getUnitMultiplier = (fromUnit, toUnit) => {
-  const f = (fromUnit || '').toLowerCase().trim();
-  const t = (toUnit || '').toLowerCase().trim();
-  if (f === t) return 1.0;
-  
-  const weights = { 
-    g: 1.0, gram: 1.0, grams: 1.0, 
-    kg: 1000.0, kilogram: 1000.0, kilograms: 1000.0 
-  };
-  
-  const volumes = { 
-    ml: 1.0, millilitre: 1.0, millilitres: 1.0, 
-    l: 1000.0, liter: 1000.0, liters: 1000.0, litre: 1000.0, litres: 1000.0 
-  };
-  
-  const sizes = { 
-    small: 0.7, 
-    medium: 1.0, normal: 1.0, piece: 1.0, pieces: 1.0, slice: 1.0, slices: 1.0,
-    large: 1.3,
-    cup: 1.0, cups: 1.0
-  };
-  
-  if (weights[f] !== undefined && weights[t] !== undefined) {
-    return weights[t] / weights[f];
-  }
-  
-  if (volumes[f] !== undefined && volumes[t] !== undefined) {
-    return volumes[t] / volumes[f];
-  }
-  
-  if (sizes[f] !== undefined && sizes[t] !== undefined) {
-    return sizes[t] / sizes[f];
-  }
-  
-  return 1.0;
+  const fromWeight = getUnitWeightInGrams(fromUnit);
+  const toWeight = getUnitWeightInGrams(toUnit);
+  return toWeight / fromWeight;
 };
 
 function App() {
@@ -260,6 +263,70 @@ function App() {
         };
       });
 
+      return {
+        ...msg,
+        pendingLog: {
+          ...msg.pendingLog,
+          items: updatedItems
+        }
+      };
+    }));
+  };
+
+  const handleAddDraftItem = (msgId) => {
+    setMessages(prev => prev.map(msg => {
+      if (msg.id !== msgId || !msg.pendingLog) return msg;
+      
+      const newItem = {
+        name: '',
+        quantity: 1,
+        unit: 'pieces',
+        calories: 0,
+        protein: 0,
+        carbs: 0,
+        fats: 0,
+        isNew: true,
+        origQty: 1,
+        origUnit: 'pieces',
+        origCalories: 0,
+        origProtein: 0,
+        origCarbs: 0,
+        origFats: 0
+      };
+      
+      return {
+        ...msg,
+        pendingLog: {
+          ...msg.pendingLog,
+          items: [...msg.pendingLog.items, newItem]
+        }
+      };
+    }));
+  };
+
+  const handleUpdateCustomField = (msgId, itemIndex, field, value) => {
+    setMessages(prev => prev.map(msg => {
+      if (msg.id !== msgId || !msg.pendingLog) return msg;
+      
+      const updatedItems = msg.pendingLog.items.map((item, idx) => {
+        if (idx !== itemIndex) return item;
+        
+        let parsedVal = value;
+        if (field === 'calories' || field === 'protein' || field === 'carbs' || field === 'fats') {
+          parsedVal = parseFloat(value);
+          if (isNaN(parsedVal)) parsedVal = 0;
+        }
+        
+        return {
+          ...item,
+          [field]: parsedVal,
+          ...(field === 'calories' && { origCalories: parsedVal }),
+          ...(field === 'protein' && { origProtein: parsedVal }),
+          ...(field === 'carbs' && { origCarbs: parsedVal }),
+          ...(field === 'fats' && { origFats: parsedVal })
+        };
+      });
+      
       return {
         ...msg,
         pendingLog: {
@@ -568,7 +635,29 @@ function App() {
                         <tbody>
                           {msg.pendingLog.items.map((item, idx) => (
                             <tr key={idx}>
-                              <td style={{ fontWeight: '500' }}>{item.name}</td>
+                              <td style={{ fontWeight: '500' }}>
+                                {item.isNew ? (
+                                  <input 
+                                    type="text"
+                                    placeholder="Food Name"
+                                    value={item.name}
+                                    onChange={(e) => handleUpdateCustomField(msg.id, idx, 'name', e.target.value)}
+                                    style={{
+                                      width: '100%',
+                                      padding: '4px 8px',
+                                      border: '1.5px solid var(--border)',
+                                      borderRadius: '3px',
+                                      fontFamily: 'var(--sans)',
+                                      fontSize: '13px',
+                                      background: 'var(--bg)',
+                                      color: 'var(--text-h)',
+                                      outline: 'none'
+                                    }}
+                                  />
+                                ) : (
+                                  item.name
+                                )}
+                              </td>
                               <td>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                   <input 
@@ -613,10 +702,63 @@ function App() {
                                 </div>
                               </td>
                               <td style={{ textAlign: 'right' }}>
-                                <strong>{Math.round(item.calories)} kcal</strong>
-                                <div className="draft-item-macros" style={{ fontSize: '11px', color: 'var(--text)', opacity: 0.8 }}>
-                                  P:{Math.round(item.protein)}g | C:{Math.round(item.carbs)}g | F:{Math.round(item.fats)}g
-                                </div>
+                                {item.isNew ? (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-end' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                      <input 
+                                        type="number"
+                                        placeholder="kcal"
+                                        value={item.calories || ''}
+                                        onChange={(e) => handleUpdateCustomField(msg.id, idx, 'calories', e.target.value)}
+                                        style={{
+                                          width: '64px',
+                                          padding: '3px 6px',
+                                          border: '1.5px solid var(--border)',
+                                          borderRadius: '3px',
+                                          fontFamily: 'var(--mono)',
+                                          fontSize: '12px',
+                                          background: 'var(--bg)',
+                                          color: 'var(--text-h)',
+                                          textAlign: 'right'
+                                        }}
+                                      />
+                                      <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text)' }}>kcal</span>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '4px' }}>
+                                      <input 
+                                        type="number"
+                                        placeholder="P"
+                                        title="Protein (g)"
+                                        value={item.protein || ''}
+                                        onChange={(e) => handleUpdateCustomField(msg.id, idx, 'protein', e.target.value)}
+                                        style={{ width: '38px', padding: '2px 4px', border: '1.5px solid var(--border)', borderRadius: '3px', fontFamily: 'var(--mono)', fontSize: '11px', background: 'var(--bg)', color: 'var(--text-h)', textAlign: 'center' }}
+                                      />
+                                      <input 
+                                        type="number"
+                                        placeholder="C"
+                                        title="Carbs (g)"
+                                        value={item.carbs || ''}
+                                        onChange={(e) => handleUpdateCustomField(msg.id, idx, 'carbs', e.target.value)}
+                                        style={{ width: '38px', padding: '2px 4px', border: '1.5px solid var(--border)', borderRadius: '3px', fontFamily: 'var(--mono)', fontSize: '11px', background: 'var(--bg)', color: 'var(--text-h)', textAlign: 'center' }}
+                                      />
+                                      <input 
+                                        type="number"
+                                        placeholder="F"
+                                        title="Fats (g)"
+                                        value={item.fats || ''}
+                                        onChange={(e) => handleUpdateCustomField(msg.id, idx, 'fats', e.target.value)}
+                                        style={{ width: '38px', padding: '2px 4px', border: '1.5px solid var(--border)', borderRadius: '3px', fontFamily: 'var(--mono)', fontSize: '11px', background: 'var(--bg)', color: 'var(--text-h)', textAlign: 'center' }}
+                                      />
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <strong>{Math.round(item.calories)} kcal</strong>
+                                    <div className="draft-item-macros" style={{ fontSize: '11px', color: 'var(--text)', opacity: 0.8 }}>
+                                      P:{parseFloat(item.protein.toFixed(1))}g | C:{parseFloat(item.carbs.toFixed(1))}g | F:{parseFloat(item.fats.toFixed(1))}g
+                                    </div>
+                                  </>
+                                )}
                               </td>
                               <td style={{ textAlign: 'center' }}>
                                 <button 
@@ -646,6 +788,34 @@ function App() {
                           ))}
                         </tbody>
                       </table>
+                      <button
+                        type="button"
+                        onClick={() => handleAddDraftItem(msg.id)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--accent)',
+                          cursor: 'pointer',
+                          fontSize: '13px',
+                          fontWeight: '700',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          alignSelf: 'flex-start',
+                          marginTop: '4px',
+                          marginBottom: '12px',
+                          padding: '4px 8px',
+                          borderRadius: '4px',
+                          transition: 'background 0.2s'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = 'var(--accent-bg)'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                      >
+                        <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                        </svg>
+                        Add Food Item
+                      </button>
                       <div className="draft-actions">
                         <button 
                           className="btn btn-confirm" 
