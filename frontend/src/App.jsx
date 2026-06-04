@@ -7,6 +7,43 @@ const PROTEIN_TARGET = 130;
 const CARBS_TARGET = 250;
 const FATS_TARGET = 65;
 
+const getUnitMultiplier = (fromUnit, toUnit) => {
+  const f = (fromUnit || '').toLowerCase().trim();
+  const t = (toUnit || '').toLowerCase().trim();
+  if (f === t) return 1.0;
+  
+  const weights = { 
+    g: 1.0, gram: 1.0, grams: 1.0, 
+    kg: 1000.0, kilogram: 1000.0, kilograms: 1000.0 
+  };
+  
+  const volumes = { 
+    ml: 1.0, millilitre: 1.0, millilitres: 1.0, 
+    l: 1000.0, liter: 1000.0, liters: 1000.0, litre: 1000.0, litres: 1000.0 
+  };
+  
+  const sizes = { 
+    small: 0.7, 
+    medium: 1.0, normal: 1.0, piece: 1.0, pieces: 1.0, slice: 1.0, slices: 1.0,
+    large: 1.3,
+    cup: 1.0, cups: 1.0
+  };
+  
+  if (weights[f] !== undefined && weights[t] !== undefined) {
+    return weights[t] / weights[f];
+  }
+  
+  if (volumes[f] !== undefined && volumes[t] !== undefined) {
+    return volumes[t] / volumes[f];
+  }
+  
+  if (sizes[f] !== undefined && sizes[t] !== undefined) {
+    return sizes[t] / sizes[f];
+  }
+  
+  return 1.0;
+};
+
 function App() {
   const [userId] = useState(() => {
     let storedId = localStorage.getItem('foodlog_userId');
@@ -160,7 +197,18 @@ function App() {
         type: 'assistant',
         text: data.response,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        pendingLog: data.pendingLog || null,
+        pendingLog: data.pendingLog ? {
+          ...data.pendingLog,
+          items: data.pendingLog.items.map(item => ({
+            ...item,
+            origQty: item.quantity,
+            origUnit: item.unit || 'pieces',
+            origCalories: item.calories,
+            origProtein: item.protein,
+            origCarbs: item.carbs,
+            origFats: item.fats
+          }))
+        } : null,
         draftStatus: data.pendingLog ? 'pending' : null
       };
 
@@ -179,26 +227,36 @@ function App() {
     }
   };
 
-  const handleUpdateDraftItem = (msgId, itemIndex, newQtyStr) => {
-    const newQty = parseFloat(newQtyStr);
-    if (isNaN(newQty) || newQty < 0) return;
-    
+  const handleUpdateDraftItem = (msgId, itemIndex, newQtyStr, newUnit) => {
     setMessages(prev => prev.map(msg => {
       if (msg.id !== msgId || !msg.pendingLog) return msg;
       
       const updatedItems = msg.pendingLog.items.map((item, idx) => {
         if (idx !== itemIndex) return item;
         
-        const oldQty = item.quantity || 1;
-        const ratio = oldQty > 0 ? newQty / oldQty : 0;
+        const qty = newQtyStr !== undefined ? parseFloat(newQtyStr) : item.quantity;
+        const unit = newUnit !== undefined ? newUnit : item.unit;
+        
+        if (isNaN(qty) || qty < 0) return item;
+        
+        const origQty = item.origQty !== undefined ? item.origQty : item.quantity;
+        const origUnit = item.origUnit !== undefined ? item.origUnit : item.unit;
+        const origCals = item.origCalories !== undefined ? item.origCalories : item.calories;
+        const origProt = item.origProtein !== undefined ? item.origProtein : item.protein;
+        const origCarbs = item.origCarbs !== undefined ? item.origCarbs : item.carbs;
+        const origFats = item.origFats !== undefined ? item.origFats : item.fats;
+        
+        const qtyRatio = origQty > 0 ? qty / origQty : 0;
+        const unitMultiplier = getUnitMultiplier(origUnit, unit);
         
         return {
           ...item,
-          quantity: newQty,
-          calories: item.calories * ratio,
-          protein: item.protein * ratio,
-          carbs: item.carbs * ratio,
-          fats: item.fats * ratio
+          quantity: qty,
+          unit: unit,
+          calories: origCals * qtyRatio * unitMultiplier,
+          protein: origProt * qtyRatio * unitMultiplier,
+          carbs: origCarbs * qtyRatio * unitMultiplier,
+          fats: origFats * qtyRatio * unitMultiplier
         };
       });
 
@@ -530,7 +588,28 @@ function App() {
                                       color: 'var(--text-h)'
                                     }}
                                   />
-                                  <span style={{ fontSize: '12px', color: 'var(--text)' }}>{item.unit || ''}</span>
+                                  <select
+                                    value={item.unit || 'pieces'}
+                                    onChange={(e) => handleUpdateDraftItem(msg.id, idx, undefined, e.target.value)}
+                                    style={{
+                                      padding: '3px 6px',
+                                      border: '1.5px solid var(--border)',
+                                      borderRadius: '3px',
+                                      fontFamily: 'var(--sans)',
+                                      fontSize: '12px',
+                                      background: 'var(--bg)',
+                                      color: 'var(--text-h)',
+                                      outline: 'none',
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    {Array.from(new Set([
+                                      item.origUnit || item.unit,
+                                      "g", "kg", "ml", "liters", "pieces", "slice", "cup", "small", "medium", "large"
+                                    ].filter(Boolean))).map(opt => (
+                                      <option key={opt} value={opt}>{opt}</option>
+                                    ))}
+                                  </select>
                                 </div>
                               </td>
                               <td style={{ textAlign: 'right' }}>
