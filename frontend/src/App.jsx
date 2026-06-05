@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import './App.css'
 
-const API_BASE = 'http://localhost:8000';
+const API_BASE = import.meta.env.VITE_API_BASE || (import.meta.env.DEV ? 'http://localhost:8000' : '');
 const CALORIES_TARGET = 2000;
 const PROTEIN_TARGET = 130;
 const CARBS_TARGET = 250;
@@ -168,8 +168,9 @@ function App() {
 
     // Check if there is an unresolved pending draft to prevent stacking conflicts
     const hasPending = messages.some(m => m.pendingLog && m.draftStatus === 'pending');
-    if (hasPending) {
-      alert('Please confirm or discard the pending food draft card before logging new items.');
+    const isAddCommand = /^(add|also|and|plus|append)\b/i.test(text);
+    if (hasPending && !isAddCommand) {
+      alert('Please confirm or discard the pending food draft card before logging new items (or type "add [food]" to append to it).');
       return;
     }
 
@@ -215,7 +216,12 @@ function App() {
         draftStatus: data.pendingLog ? 'pending' : null
       };
 
-      setMessages(prev => [...prev, assistantMsg]);
+      setMessages(prev => {
+        const updatedPrev = data.pendingLog 
+          ? prev.map(m => m.draftStatus === 'pending' ? { ...m, draftStatus: 'superseded' } : m)
+          : prev;
+        return [...updatedPrev, assistantMsg];
+      });
     } catch (err) {
       console.error(err);
       const errorMsg = {

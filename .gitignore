@@ -30,7 +30,8 @@ dev.db
 *.sln
 *.swp
 
-# Frontend Build & Dependencies
+# Frontend & Monorepo Build & Dependencies
+node_modules/
 frontend/node_modules/
 frontend/dist/
 frontend/.svelte-kit/

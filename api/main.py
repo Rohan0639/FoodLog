@@ -66,21 +66,58 @@ def chat(request: ChatRequest, db: Session = Depends(database.get_db)):
         db.add(user)
         db.commit()
 
-    # 2. Classify, extract, and estimate in a single call
+    # 2. Check if this is an "add" operation appending to an existing draft
+    mem = db.query(database.SessionMemory).filter(database.SessionMemory.user_id == request.userId).first()
+    is_add_operation = False
+    existing_items = []
+    existing_draft_id = None
+    existing_raw_input = ""
+
+    if mem and mem.draft_items:
+        try:
+            old_draft = json.loads(mem.draft_items)
+            if old_draft and isinstance(old_draft, dict) and "items" in old_draft and old_draft["items"]:
+                existing_items = old_draft["items"]
+                existing_draft_id = old_draft.get("draftId")
+                existing_raw_input = old_draft.get("rawInput", "")
+                
+                # Check if message starts with add keywords
+                msg_clean = request.message.strip().lower()
+                if re.match(r"^(add|also|and|plus|append)\b", msg_clean):
+                    is_add_operation = True
+        except Exception:
+            pass
+
+    # Fetch recent conversation history
+    history_records = db.query(database.ChatMessage).filter(
+        database.ChatMessage.user_id == request.userId
+    ).order_by(database.ChatMessage.timestamp.asc()).all()
+    history = [{"role": h.role, "content": h.content} for h in history_records[-10:]]
+
+    # 3. Classify, extract, and estimate in a single call with history context
     try:
-        analysis = gemini.analyze_food_message(request.message)
+        analysis = gemini.analyze_food_message_with_history(request.message, history)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Gemini API error: {str(e)}")
 
     if analysis.get("intent") != "LOG_FOOD":
+        # Save user message to database
+        user_msg = database.ChatMessage(user_id=request.userId, role="user", content=request.message)
+        db.add(user_msg)
+        
+        # Save model response to database
+        model_response_text = analysis.get("response", "Hello! I am your food logging assistant. Tell me what you ate to log it.")
+        model_msg = database.ChatMessage(user_id=request.userId, role="model", content=model_response_text)
+        db.add(model_msg)
+        db.commit()
+
         return {
             "intent": "OTHER",
-            "response": analysis.get("response", "Hello! I am your food logging assistant. Tell me what you ate to log it.")
+            "response": model_response_text
         }
 
     # Extract draft items from analysis response
-    draft_items = []
-    total_cals = 0
+    new_items = []
     items_list = analysis.get("items", [])
     if not isinstance(items_list, list):
         items_list = []
@@ -97,7 +134,7 @@ def chat(request: ChatRequest, db: Session = Depends(database.get_db)):
         carbs = safe_float(item.get("carbs"), 0.0)
         fats = safe_float(item.get("fats"), 0.0)
 
-        draft_items.append({
+        new_items.append({
             "name": food_name,
             "quantity": parsed_qty,
             "unit": item.get("unit"),
@@ -106,20 +143,39 @@ def chat(request: ChatRequest, db: Session = Depends(database.get_db)):
             "carbs": carbs,
             "fats": fats
         })
-        total_cals += cals
 
-    if not draft_items:
+    if not new_items and not is_add_operation:
+        # Save user message to database
+        user_msg = database.ChatMessage(user_id=request.userId, role="user", content=request.message)
+        db.add(user_msg)
+        
+        # Save model response to database
+        model_response_text = analysis.get("response", "I couldn't identify any food items. Tell me what you ate to log it.")
+        model_msg = database.ChatMessage(user_id=request.userId, role="model", content=model_response_text)
+        db.add(model_msg)
+        db.commit()
+
         return {
             "intent": "OTHER",
-            "response": "I couldn't identify any food items. Tell me what you ate to log it."
+            "response": model_response_text
         }
 
+    # 4. Merge items if appending, otherwise create new list
+    if is_add_operation and new_items:
+        draft_items = existing_items + new_items
+        raw_input = f"{existing_raw_input} + {request.message}"
+        draft_id = existing_draft_id if existing_draft_id else str(uuid.uuid4())
+        response_msg_prefix = "Added to draft. "
+    else:
+        draft_items = new_items
+        raw_input = request.message
+        draft_id = str(uuid.uuid4())
+        response_msg_prefix = ""
+
     # 5. Store in SessionMemory
-    mem = db.query(database.SessionMemory).filter(database.SessionMemory.user_id == request.userId).first()
-    draft_id = str(uuid.uuid4())
     stored_data = {
         "draftId": draft_id,
-        "rawInput": request.message,
+        "rawInput": raw_input,
         "items": draft_items
     }
     
@@ -128,14 +184,25 @@ def chat(request: ChatRequest, db: Session = Depends(database.get_db)):
         db.add(mem)
     else:
         mem.draft_items = json.dumps(stored_data)
+
+    # Save user message to database
+    user_msg = database.ChatMessage(user_id=request.userId, role="user", content=request.message)
+    db.add(user_msg)
+
+    # 6. Build response
+    total_cals = sum(d["calories"] for d in draft_items)
+    food_names = ", ".join([d["name"] for d in draft_items])
+    model_response_text = f"{response_msg_prefix}{food_names} ≈ {total_cals:.1f} kcal. Do you want to log this?"
+
+    # Save model response to database
+    model_msg = database.ChatMessage(user_id=request.userId, role="model", content=model_response_text)
+    db.add(model_msg)
     
     db.commit()
 
-    # 6. Build response
-    food_names = ", ".join([d["name"] for d in draft_items])
     return {
         "intent": "LOG_FOOD",
-        "response": f"{food_names} ≈ {total_cals} kcal. Do you want to log this?",
+        "response": model_response_text,
         "pendingLog": stored_data
     }
 
