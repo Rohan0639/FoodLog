@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import type { Message, FoodItem, DailyGoal } from './types';
-import { parseFoodMessage, enrichParsedFood } from './utils/parserMock';
+import { parseFoodMessage } from './utils/parserMock';
 import { EmptyState } from './components/EmptyState';
 import { ChatMessage } from './components/ChatMessage';
 import { ChatInput } from './components/ChatInput';
@@ -53,7 +53,7 @@ export default function App() {
     setIsBotTyping(true);
 
     try {
-      // Call local Express backend POST /parse-food
+      // 1. Call local Express backend POST /parse-food
       const response = await fetch('http://localhost:5000/parse-food', {
         method: 'POST',
         headers: {
@@ -63,18 +63,44 @@ export default function App() {
       });
 
       if (!response.ok) {
-        throw new Error(`Server returned status: ${response.status}`);
+        throw new Error(`Parser server returned status: ${response.status}`);
       }
 
-      const data = await response.json(); // Expected: { foods: [ { name: "banana", quantity: 2, unit: "piece" } ] }
-      
-      const parsedItems: FoodItem[] = (data.foods || []).map((item: any, index: number) => {
-        return enrichParsedFood(item.name, item.quantity, item.unit, index);
-      });
+      const parseData = await response.json(); // Expected: { foods: [ { name: "banana", quantity: 2, unit: "piece" } ] }
+      const extractedFoods = parseData.foods || [];
 
+      let parsedItems: FoodItem[] = [];
       let replyText = '';
-      
-      if (parsedItems.length > 0) {
+
+      if (extractedFoods.length > 0) {
+        // 2. Fetch real nutrition details from Spoonacular via backend POST /get-nutrition
+        const nutritionResponse = await fetch('http://localhost:5000/get-nutrition', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ foods: extractedFoods }),
+        });
+
+        if (!nutritionResponse.ok) {
+          throw new Error(`Nutrition server returned status: ${nutritionResponse.status}`);
+        }
+
+        const nutritionData = await nutritionResponse.json(); // Expected: { items: [...], total: {...} }
+        const items = nutritionData.items || [];
+
+        parsedItems = items.map((item: any, index: number) => ({
+          id: `food-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
+          name: item.name,
+          quantity: item.quantity,
+          unit: item.unit,
+          calories: item.calories,
+          protein: item.protein,
+          carbs: item.carbs,
+          fat: item.fat,
+          loggedAt: new Date()
+        }));
+
         setFoods((prev) => [...prev, ...parsedItems]);
         
         // Confetti celebration
@@ -85,7 +111,7 @@ export default function App() {
           colors: ['#ffffff', '#e4e4e7', '#a1a1aa', '#52525b']
         });
 
-        const totalCalories = parsedItems.reduce((acc, curr) => acc + curr.calories, 0);
+        const totalCalories = nutritionData.total?.calories || 0;
         const foodNames = parsedItems.map(f => `"${f.name}" (${f.calories} kcal)`).join(', and ');
         
         replyText = `Got it! I parsed and logged ${foodNames}. Added a total of **${totalCalories} calories** to your tracker.`;
