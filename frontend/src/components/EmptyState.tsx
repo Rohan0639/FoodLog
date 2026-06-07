@@ -17,26 +17,26 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onSelectSuggestion }) =>
     <div className="flex flex-col items-center justify-center text-center p-8 py-16 h-full max-w-md mx-auto animate-slide-up">
       {/* Visual Icon */}
       <div className="relative mb-6">
-        <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 text-emerald-400">
+        <div className="w-16 h-16 rounded-2xl bg-zinc-900 flex items-center justify-center border border-zinc-800 text-white shadow-sm">
           <Apple className="w-8 h-8" />
         </div>
-        <div className="absolute -top-1 -right-1 w-4 h-4 bg-indigo-500 rounded-full flex items-center justify-center animate-pulse">
-          <Sparkles className="w-2.5 h-2.5 text-white" />
+        <div className="absolute -top-1 -right-1 w-4 h-4 bg-white rounded-full flex items-center justify-center animate-pulse border border-black shadow">
+          <Sparkles className="w-2.5 h-2.5 text-black" />
         </div>
       </div>
 
       {/* Hero Title */}
       <h2 className="text-2xl font-bold tracking-tight text-white mb-2 font-sans">
-        FoodLog AI Assistant
+        FoodLog Assistant
       </h2>
-      <p className="text-sm text-slate-400 mb-8 max-w-xs">
-        Log your meals naturally. Type exactly what you ate, and let the AI compute your macros.
+      <p className="text-sm text-zinc-400 mb-8 max-w-xs">
+        Log your meals naturally. Type exactly what you ate, and let the assistant compute your macros.
       </p>
 
       {/* Suggested prompts */}
       <div className="w-full space-y-3">
-        <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1 px-1 justify-start">
-          <MessageSquarePlus className="w-3.5 h-3.5" />
+        <div className="flex items-center gap-2 text-xs font-semibold text-zinc-450 uppercase tracking-wider mb-1 px-1 justify-start">
+          <MessageSquarePlus className="w-3.5 h-3.5 text-zinc-400" />
           <span>Quick Log Examples</span>
         </div>
         
@@ -44,20 +44,20 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onSelectSuggestion }) =>
           <button
             key={index}
             onClick={() => onSelectSuggestion(suggestion.text)}
-            className="w-full text-left p-3.5 rounded-xl border border-slate-800/80 bg-slate-900/40 hover:bg-slate-850 hover:border-slate-700/80 transition-all duration-200 group flex items-start gap-3.5 shadow-sm"
+            className="w-full text-left p-3.5 rounded-xl border border-zinc-800 bg-zinc-900/30 hover:bg-zinc-900 hover:border-zinc-700 transition-all duration-200 group flex items-start gap-3.5 shadow-sm"
           >
             <span className="text-xl leading-none pt-0.5" role="img" aria-label="emoji">
               {suggestion.icon}
             </span>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-slate-500 mb-0.5">
+              <p className="text-xs font-semibold text-zinc-500 mb-0.5">
                 {suggestion.category}
               </p>
-              <p className="text-sm font-medium text-slate-200 group-hover:text-emerald-400 transition-colors truncate">
+              <p className="text-sm font-semibold text-zinc-200 group-hover:text-white transition-colors truncate">
                 "{suggestion.text}"
               </p>
             </div>
-            <span className="self-center text-slate-600 group-hover:text-emerald-400 transition-colors pl-2">
+            <span className="self-center text-zinc-500 group-hover:text-white transition-colors pl-2">
               <Plus className="w-4 h-4" />
             </span>
           </button>
@@ -65,8 +65,8 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onSelectSuggestion }) =>
       </div>
 
       {/* Tips footer */}
-      <div className="mt-8 flex items-center gap-2 text-xs text-slate-500 bg-slate-900/30 px-3 py-1.5 rounded-full border border-slate-900/50">
-        <Flame className="w-3.5 h-3.5 text-orange-400" />
+      <div className="mt-8 flex items-center gap-2 text-xs text-zinc-400 bg-zinc-900/40 px-3 py-1.5 rounded-full border border-zinc-800">
+        <Flame className="w-3.5 h-3.5 text-white" />
         <span>Try mixing multiple foods with "and" or "+"</span>
       </div>
     </div>

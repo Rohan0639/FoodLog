@@ -43,9 +43,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled = 
   return (
     <form
       onSubmit={handleSubmit}
-      className="p-4 bg-slate-950 border-t border-slate-900 flex gap-2 items-end max-w-2xl mx-auto w-full"
+      className="p-4 bg-black border-t border-zinc-900 flex gap-2 items-end max-w-2xl mx-auto w-full"
     >
-      <div className="relative flex-1 flex items-center bg-slate-900 border border-slate-800 rounded-2xl focus-within:border-emerald-500/50 focus-within:ring-2 focus-within:ring-emerald-500/10 transition-all duration-200">
+      <div className="relative flex-1 flex items-center bg-zinc-950 border border-zinc-850 rounded-2xl focus-within:border-white focus-within:ring-2 focus-within:ring-white/10 transition-all duration-200">
         <textarea
           ref={textareaRef}
           value={inputText}
@@ -54,7 +54,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled = 
           placeholder="I ate 2 bananas and 3 eggs..."
           rows={1}
           disabled={disabled}
-          className="w-full pl-4 pr-12 py-3 bg-transparent text-sm text-slate-100 placeholder-slate-500 focus:outline-none resize-none max-h-40 min-h-[44px] leading-relaxed self-center align-middle"
+          className="w-full pl-4 pr-12 py-3 bg-transparent text-sm text-white placeholder-zinc-500 focus:outline-none resize-none max-h-40 min-h-[44px] leading-relaxed self-center align-middle"
         />
         
         <button
@@ -62,8 +62,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled = 
           disabled={!inputText.trim() || disabled}
           className={`absolute right-2.5 bottom-2 w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 ${
             inputText.trim() && !disabled
-              ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/10 hover:bg-emerald-600 scale-100 hover:scale-105 active:scale-95'
-              : 'text-slate-600 cursor-not-allowed bg-transparent scale-90'
+              ? 'bg-white text-black shadow hover:bg-zinc-200 scale-100 hover:scale-105 active:scale-95'
+              : 'text-zinc-600 cursor-not-allowed bg-transparent scale-90'
           }`}
         >
           <SendHorizontal className="w-4.5 h-4.5" />

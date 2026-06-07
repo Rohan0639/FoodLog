@@ -4,10 +4,7 @@
 
 @layer base {
   body {
-    @apply bg-slate-950 text-slate-100 antialiased font-sans m-0 p-0 overflow-hidden h-screen;
-    background-image: 
-      radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.05) 0px, transparent 50%),
-      radial-gradient(at 100% 0%, rgba(99, 102, 241, 0.05) 0px, transparent 50%);
+    @apply bg-black text-white antialiased font-sans m-0 p-0 overflow-hidden h-screen;
   }
 
   #root {
@@ -17,8 +14,8 @@
 
 /* Custom scrollbar styling for a cleaner look */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
@@ -26,25 +23,25 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.15);
+  background: rgba(255, 255, 255, 0.15);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.3);
+  background: rgba(255, 255, 255, 0.3);
 }
 
-/* Custom styling for glassmorphism panels */
+/* Custom styling for glassmorphism panels - strictly black and white */
 .glass {
-  background: rgba(15, 23, 42, 0.65);
+  background: rgba(10, 10, 10, 0.8);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.glass-emerald {
-  background: rgba(4, 120, 87, 0.2);
+.glass-monochrome {
+  background: rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(16, 185, 129, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.15);
 }

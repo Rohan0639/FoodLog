@@ -64,12 +64,12 @@ export default function App() {
         // Successful parsing
         setFoods((prev) => [...prev, ...parsed]);
         
-        // Trigger celebratory confetti effect
+        // Trigger celebratory monochrome confetti effect
         confetti({
           particleCount: 80,
           spread: 60,
           origin: { y: 0.85 },
-          colors: ['#10b981', '#34d399', '#6ee7b7', '#6366f1']
+          colors: ['#ffffff', '#e4e4e7', '#a1a1aa', '#52525b']
         });
 
         const totalCalories = parsed.reduce((acc, curr) => acc + curr.calories, 0);
@@ -115,22 +115,22 @@ export default function App() {
   };
 
   return (
-    <div className="flex flex-row h-screen w-full overflow-hidden bg-slate-950">
+    <div className="flex flex-row h-screen w-full overflow-hidden bg-black text-white">
       
       {/* LEFT AREA: Chat container */}
       <div className="flex-1 flex flex-col h-full overflow-hidden relative">
         
         {/* Chat Header */}
-        <header className="h-16 border-b border-slate-900 px-6 flex items-center justify-between bg-slate-950/85 backdrop-blur-md shrink-0 z-20">
+        <header className="h-16 border-b border-zinc-900 px-6 flex items-center justify-between bg-black/90 backdrop-blur-md shrink-0 z-20">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center text-white shadow-md shadow-emerald-500/25">
-              <Apple className="w-5 h-5 fill-white/10" />
+            <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-black shadow">
+              <Apple className="w-5 h-5 fill-black/10" />
             </div>
             <div>
               <h1 className="text-sm font-bold text-white leading-none">FoodLog Assistant</h1>
               <div className="flex items-center gap-1.5 mt-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">AI Logging Active</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">AI Logging Active</span>
               </div>
             </div>
           </div>
@@ -138,12 +138,12 @@ export default function App() {
           {/* Collapsible Mobile Dashboard Trigger */}
           <button
             onClick={() => setIsDashboardOpenMobile(!isDashboardOpenMobile)}
-            className="lg:hidden p-2 rounded-xl border border-slate-800 bg-slate-900/60 text-slate-300 hover:text-white flex items-center gap-1.5 shadow-sm active:scale-95 transition-all duration-150"
+            className="lg:hidden p-2 rounded-xl border border-zinc-850 bg-zinc-900/80 text-zinc-350 hover:text-white flex items-center gap-1.5 shadow-sm active:scale-95 transition-all duration-150"
           >
-            <BarChart2 className="w-4.5 h-4.5 text-emerald-400" />
-            <span className="text-xs font-semibold">Stats</span>
+            <BarChart2 className="w-4.5 h-4.5 text-white" />
+            <span className="text-xs font-bold">Stats</span>
             {foods.length > 0 && (
-              <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0" />
+              <span className="w-2 h-2 rounded-full bg-white shrink-0" />
             )}
           </button>
         </header>
@@ -197,15 +197,15 @@ export default function App() {
           {/* Overlay click to close backdrop */}
           <div
             onClick={() => setIsDashboardOpenMobile(false)}
-            className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm transition-opacity duration-300"
+            className="absolute inset-0 bg-black/85 backdrop-blur-sm transition-opacity duration-300"
           />
           
           {/* Slider content */}
-          <div className="relative w-80 max-w-[85%] h-full bg-slate-950 border-l border-slate-900 shadow-2xl flex flex-col animate-slide-up">
+          <div className="relative w-80 max-w-[85%] h-full bg-black border-l border-zinc-900 shadow-2xl flex flex-col animate-slide-up">
             {/* Close button inside mobile slide-over drawer */}
             <button
               onClick={() => setIsDashboardOpenMobile(false)}
-              className="absolute top-4 right-4 p-1.5 rounded-lg border border-slate-800 bg-slate-900 text-slate-400 hover:text-white z-25 transition-all duration-200"
+              className="absolute top-4 right-4 p-1.5 rounded-lg border border-zinc-850 bg-zinc-900 text-zinc-400 hover:text-white z-25 transition-all duration-200"
             >
               <X className="w-4 h-4" />
             </button>

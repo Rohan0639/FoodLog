@@ -24,8 +24,8 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
       <div
         className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-sm border ${
           isUser
-            ? 'bg-slate-850 border-emerald-500/20 text-emerald-400'
-            : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+            ? 'bg-zinc-900 border-zinc-800 text-white'
+            : 'bg-zinc-900 border-zinc-800 text-white'
         }`}
       >
         {isUser ? <User className="w-5 h-5" /> : <Bot className="w-5 h-5" />}
@@ -38,16 +38,16 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
         <div
           className={`px-4 py-3 rounded-2xl text-[14.5px] leading-relaxed shadow-sm ${
             isUser
-              ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-tr-none'
-              : 'bg-slate-900 border border-slate-800 text-slate-100 rounded-tl-none'
+              ? 'bg-white text-black font-semibold rounded-tr-none'
+              : 'bg-zinc-900 border border-zinc-800 text-zinc-100 rounded-tl-none'
           }`}
         >
           {message.isTyping ? (
             /* Animated Typing Indicator */
             <div className="flex items-center gap-1.5 py-1 px-0.5">
-              <span className="w-2 h-2 rounded-full bg-slate-400 animate-typing" style={{ animationDelay: '0ms' }} />
-              <span className="w-2 h-2 rounded-full bg-slate-400 animate-typing" style={{ animationDelay: '200ms' }} />
-              <span className="w-2 h-2 rounded-full bg-slate-400 animate-typing" style={{ animationDelay: '400ms' }} />
+              <span className="w-2 h-2 rounded-full bg-zinc-500 animate-typing" style={{ animationDelay: '0ms' }} />
+              <span className="w-2 h-2 rounded-full bg-zinc-500 animate-typing" style={{ animationDelay: '200ms' }} />
+              <span className="w-2 h-2 rounded-full bg-zinc-500 animate-typing" style={{ animationDelay: '400ms' }} />
             </div>
           ) : (
             <div>{message.text}</div>
@@ -56,15 +56,15 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
 
         {/* Parsed Food Receipt (if any) */}
         {!message.isTyping && message.parsedFoods && message.parsedFoods.length > 0 && (
-          <div className="w-full mt-2 rounded-xl bg-slate-900/60 border border-slate-800/80 p-3.5 space-y-3 shadow-inner animate-fade-in">
+          <div className="w-full mt-2 rounded-xl bg-zinc-950 border border-zinc-850 p-3.5 space-y-3 shadow-inner animate-fade-in">
             {/* Header info */}
-            <div className="flex items-center justify-between pb-2 border-b border-slate-800/60">
-              <span className="text-xs font-semibold text-slate-400 tracking-wide uppercase flex items-center gap-1.5">
-                <Apple className="w-3.5 h-3.5 text-emerald-400" />
+            <div className="flex items-center justify-between pb-2 border-b border-zinc-850">
+              <span className="text-xs font-bold text-zinc-300 tracking-wide uppercase flex items-center gap-1.5">
+                <Apple className="w-3.5 h-3.5 text-white" />
                 Parsed Food Logs
               </span>
-              <span className="text-xs font-bold bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/20 flex items-center gap-1">
-                <Flame className="w-3 h-3 text-orange-400 fill-orange-400/20" />
+              <span className="text-xs font-bold bg-white text-black px-2 py-0.5 rounded-full border border-zinc-200 flex items-center gap-1">
+                <Flame className="w-3 h-3 text-black fill-black/10" />
                 {message.parsedFoods.reduce((acc, curr) => acc + curr.calories, 0)} kcal
               </span>
             </div>
@@ -72,19 +72,19 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
             {/* List of items */}
             <div className="space-y-2.5">
               {message.parsedFoods.map((food: FoodItem) => (
-                <div key={food.id} className="flex flex-col text-xs text-slate-300">
+                <div key={food.id} className="flex flex-col text-xs text-zinc-300">
                   <div className="flex justify-between items-start mb-1">
-                    <span className="font-medium flex items-center gap-1 truncate max-w-[80%]">
-                      <ChevronRight className="w-3 h-3 text-slate-500 shrink-0" />
-                      <span className="text-slate-400 font-semibold">{food.quantity}x</span> {food.name}
+                    <span className="font-semibold flex items-center gap-1 truncate max-w-[80%] text-zinc-200">
+                      <ChevronRight className="w-3 h-3 text-zinc-500 shrink-0" />
+                      <span className="text-zinc-400 font-semibold">{food.quantity}x</span> {food.name}
                     </span>
-                    <span className="font-bold text-slate-200 shrink-0">{food.calories} kcal</span>
+                    <span className="font-bold text-white shrink-0">{food.calories} kcal</span>
                   </div>
                   {/* Macros line */}
-                  <div className="flex gap-3 text-[10px] text-slate-500 pl-4">
-                    <span>Protein: <strong className="text-slate-400 font-semibold">{food.protein}g</strong></span>
-                    <span>Carbs: <strong className="text-slate-400 font-semibold">{food.carbs}g</strong></span>
-                    <span>Fat: <strong className="text-slate-400 font-semibold">{food.fat}g</strong></span>
+                  <div className="flex gap-3 text-[10px] text-zinc-450 pl-4 font-medium">
+                    <span>Protein: <strong className="text-zinc-300 font-semibold">{food.protein}g</strong></span>
+                    <span>Carbs: <strong className="text-zinc-300 font-semibold">{food.carbs}g</strong></span>
+                    <span>Fat: <strong className="text-zinc-300 font-semibold">{food.fat}g</strong></span>
                   </div>
                 </div>
               ))}
@@ -93,7 +93,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
         )}
 
         {/* Timestamp */}
-        <span className="text-[10px] text-slate-500 mt-1 px-1 font-mono uppercase">
+        <span className="text-[10px] text-zinc-500 mt-1 px-1 font-mono uppercase">
           {formatTime(message.timestamp)}
         </span>
       </div>
