@@ -8,6 +8,8 @@ import { NutritionDashboard } from './components/NutritionDashboard';
 import { Apple, BarChart2, X } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 const DEFAULT_DAILY_GOAL: DailyGoal = {
   calories: 2000,
   protein: 135,
@@ -54,7 +56,7 @@ export default function App() {
 
     try {
       // 1. Call local Express backend POST /parse-food
-      const response = await fetch('http://localhost:5000/parse-food', {
+      const response = await fetch(`${API_URL}/parse-food`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -74,7 +76,7 @@ export default function App() {
 
       if (extractedFoods.length > 0) {
         // 2. Fetch real nutrition details from Spoonacular via backend POST /get-nutrition
-        const nutritionResponse = await fetch('http://localhost:5000/get-nutrition', {
+        const nutritionResponse = await fetch(`${API_URL}/get-nutrition`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

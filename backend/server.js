@@ -52,11 +52,15 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Start the server
-app.listen(config.PORT, () => {
-  console.log(`\n=================================================`);
-  console.log(`🚀 FoodLog Backend service is running`);
-  console.log(`🔊 Listening on port: ${config.PORT}`);
-  console.log(`📡 Health endpoint: http://localhost:${config.PORT}/health`);
-  console.log(`=================================================\n`);
-});
+// Start the server only when running locally (not inside Vercel serverless environment)
+if (!process.env.VERCEL) {
+  app.listen(config.PORT, () => {
+    console.log(`\n=================================================`);
+    console.log(`🚀 FoodLog Backend service is running`);
+    console.log(`🔊 Listening on port: ${config.PORT}`);
+    console.log(`📡 Health endpoint: http://localhost:${config.PORT}/health`);
+    console.log(`=================================================\n`);
+  });
+}
+
+export default app;
