@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import config from './config.js';
 import foodRouter from './routes/food.js';
+import nutritionRouter from './routes/nutrition.js';
 
 const app = express();
 
@@ -23,6 +24,7 @@ app.use((req, res, next) => {
 
 // Register routes
 app.use('/', foodRouter);
+app.use('/', nutritionRouter);
 
 // Basic health check route
 app.get('/health', (req, res) => {
