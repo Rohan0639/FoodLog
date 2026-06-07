@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import type { Message, FoodItem, DailyGoal } from './types';
-import { parseFoodMessage } from './utils/parserMock';
+import { parseFoodMessage, enrichParsedFood } from './utils/parserMock';
 import { EmptyState } from './components/EmptyState';
 import { ChatMessage } from './components/ChatMessage';
 import { ChatInput } from './components/ChatInput';
@@ -40,7 +40,7 @@ export default function App() {
     scrollToBottom();
   }, [messages, isBotTyping]);
 
-  const handleSendMessage = (text: string) => {
+  const handleSendMessage = async (text: string) => {
     // 1. Add user message
     const userMsg: Message = {
       id: `user-${Date.now()}`,
@@ -52,19 +52,32 @@ export default function App() {
     setMessages((prev) => [...prev, userMsg]);
     setIsBotTyping(true);
 
-    // 2. Simulate Bot natural delays
-    const typingTime = 900 + Math.random() * 600; // 900ms - 1500ms
-    
-    setTimeout(() => {
-      // Parse query
-      const parsed = parseFoodMessage(text);
+    try {
+      // Call local Express backend POST /parse-food
+      const response = await fetch('http://localhost:5000/parse-food', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server returned status: ${response.status}`);
+      }
+
+      const data = await response.json(); // Expected: { foods: [ { name: "banana", quantity: 2, unit: "piece" } ] }
+      
+      const parsedItems: FoodItem[] = (data.foods || []).map((item: any, index: number) => {
+        return enrichParsedFood(item.name, item.quantity, item.unit, index);
+      });
+
       let replyText = '';
       
-      if (parsed.length > 0) {
-        // Successful parsing
-        setFoods((prev) => [...prev, ...parsed]);
+      if (parsedItems.length > 0) {
+        setFoods((prev) => [...prev, ...parsedItems]);
         
-        // Trigger celebratory monochrome confetti effect
+        // Confetti celebration
         confetti({
           particleCount: 80,
           spread: 60,
@@ -72,13 +85,12 @@ export default function App() {
           colors: ['#ffffff', '#e4e4e7', '#a1a1aa', '#52525b']
         });
 
-        const totalCalories = parsed.reduce((acc, curr) => acc + curr.calories, 0);
-        const foodNames = parsed.map(f => `"${f.name}" (${f.calories} kcal)`).join(', and ');
+        const totalCalories = parsedItems.reduce((acc, curr) => acc + curr.calories, 0);
+        const foodNames = parsedItems.map(f => `"${f.name}" (${f.calories} kcal)`).join(', and ');
         
         replyText = `Got it! I parsed and logged ${foodNames}. Added a total of **${totalCalories} calories** to your tracker.`;
       } else {
-        // Fallback if no matching structure
-        replyText = `Got it! I logged "${text}" as a meal entry, but couldn't resolve precise ingredient details. Processing your food log...`;
+        replyText = `I couldn't identify any food items in your message. Could you try describing it differently?`;
       }
 
       const botMsg: Message = {
@@ -86,12 +98,46 @@ export default function App() {
         sender: 'bot',
         text: replyText,
         timestamp: new Date(),
+        parsedFoods: parsedItems,
+      };
+
+      setMessages((prev) => [...prev, botMsg]);
+    } catch (error: any) {
+      console.warn('Failed to communicate with parse-food backend. Falling back to local offline parser...', error);
+      
+      const parsed = parseFoodMessage(text);
+      let replyText = '';
+      
+      if (parsed.length > 0) {
+        setFoods((prev) => [...prev, ...parsed]);
+        
+        confetti({
+          particleCount: 45,
+          spread: 50,
+          origin: { y: 0.85 },
+          colors: ['#ffffff', '#a1a1aa']
+        });
+
+        const totalCalories = parsed.reduce((acc, curr) => acc + curr.calories, 0);
+        const foodNames = parsed.map(f => `"${f.name}" (${f.calories} kcal)`).join(', and ');
+        
+        replyText = `[Offline Mode] Logged: ${foodNames}. Added **${totalCalories} calories** to your tracker. (Express server is unreachable)`;
+      } else {
+        replyText = `I encountered an error connecting to the AI parser, and local fallback parsing failed.`;
+      }
+
+      const botMsg: Message = {
+        id: `bot-fallback-${Date.now()}`,
+        sender: 'bot',
+        text: replyText,
+        timestamp: new Date(),
         parsedFoods: parsed,
       };
 
       setMessages((prev) => [...prev, botMsg]);
+    } finally {
       setIsBotTyping(false);
-    }, typingTime);
+    }
   };
 
   const handleRemoveFood = (id: string) => {

@@ -160,3 +160,36 @@ export function parseFoodMessage(text: string): FoodItem[] {
   
   return items;
 }
+
+export function enrichParsedFood(name: string, quantity: number, unit: string, index: number = 0): FoodItem {
+  const normalizedQuery = name.toLowerCase().trim();
+  const dbFood = FOOD_DATABASE[normalizedQuery];
+  
+  if (dbFood) {
+    return {
+      id: `food-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
+      name: dbFood.name,
+      quantity,
+      unit: unit || dbFood.unit,
+      calories: Math.round(dbFood.calories * quantity),
+      protein: Math.round(dbFood.protein * quantity * 10) / 10,
+      carbs: Math.round(dbFood.carbs * quantity * 10) / 10,
+      fat: Math.round(dbFood.fat * quantity * 10) / 10,
+      loggedAt: new Date()
+    };
+  } else {
+    const generated = generateMacrosForUnknownFood(normalizedQuery);
+    return {
+      id: `food-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
+      name: generated.name,
+      quantity,
+      unit: unit || 'serving',
+      calories: Math.round(generated.calories * quantity),
+      protein: Math.round(generated.protein * quantity * 10) / 10,
+      carbs: Math.round(generated.carbs * quantity * 10) / 10,
+      fat: Math.round(generated.fat * quantity * 10) / 10,
+      loggedAt: new Date()
+    };
+  }
+}
+
