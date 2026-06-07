@@ -161,33 +161,65 @@ export function parseFoodMessage(text: string): FoodItem[] {
   return items;
 }
 
+function getScaleFactor(dbUnit: string, userUnit: string): number {
+  const normDb = dbUnit.toLowerCase().trim();
+  const normUser = userUnit.toLowerCase().trim();
+  
+  if (normDb === normUser) return 1;
+  
+  // Case 1: Database unit is "100g" (e.g., chicken, rice)
+  if (normDb === '100g') {
+    if (normUser === 'g' || normUser === 'grams' || normUser === 'gram') {
+      return 0.01; // 1g = 0.01 of 100g
+    }
+  }
+  
+  // Case 2: Database unit is "cup" (e.g., milk, blueberries)
+  if (normDb === 'cup') {
+    if (normUser === 'ml' || normUser === 'milliliters' || normUser === 'ml.') {
+      return 1 / 240; // 1 cup = 240ml
+    }
+    if (normUser === 'g' || normUser === 'grams' || normUser === 'gram') {
+      return 1 / 240; // Approx 1g = 1ml for liquids
+    }
+  }
+  
+  return 1;
+}
+
 export function enrichParsedFood(name: string, quantity: number, unit: string, index: number = 0): FoodItem {
   const normalizedQuery = name.toLowerCase().trim();
   const dbFood = FOOD_DATABASE[normalizedQuery];
   
   if (dbFood) {
+    const scale = getScaleFactor(dbFood.unit, unit);
     return {
       id: `food-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
       name: dbFood.name,
       quantity,
       unit: unit || dbFood.unit,
-      calories: Math.round(dbFood.calories * quantity),
-      protein: Math.round(dbFood.protein * quantity * 10) / 10,
-      carbs: Math.round(dbFood.carbs * quantity * 10) / 10,
-      fat: Math.round(dbFood.fat * quantity * 10) / 10,
+      calories: Math.round(dbFood.calories * quantity * scale),
+      protein: Math.round(dbFood.protein * quantity * scale * 10) / 10,
+      carbs: Math.round(dbFood.carbs * quantity * scale * 10) / 10,
+      fat: Math.round(dbFood.fat * quantity * scale * 10) / 10,
       loggedAt: new Date()
     };
   } else {
     const generated = generateMacrosForUnknownFood(normalizedQuery);
+    // For unknown foods, if logged in grams or ml, assume the generated macros were per 100g/ml
+    const lowerUnit = (unit || '').toLowerCase().trim();
+    const isWeightVolume = ['g', 'grams', 'gram', 'ml', 'milliliters'].includes(lowerUnit);
+    const scale = isWeightVolume ? 0.01 : 1;
+    
     return {
       id: `food-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
       name: generated.name,
       quantity,
       unit: unit || 'serving',
-      calories: Math.round(generated.calories * quantity),
-      protein: Math.round(generated.protein * quantity * 10) / 10,
-      carbs: Math.round(generated.carbs * quantity * 10) / 10,
-      fat: Math.round(generated.fat * quantity * 10) / 10,
+      calories: Math.round(generated.calories * quantity * scale),
+      protein: Math.round(generated.protein * quantity * scale * 10) / 10,
+      carbs: Math.round(generated.carbs * quantity * scale * 10) / 10,
+      fat: Math.round(generated.fat * quantity * scale * 10) / 10,
       loggedAt: new Date()
     };
   }
