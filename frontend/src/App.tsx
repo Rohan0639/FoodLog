@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import type { Message, FoodItem, DailyGoal } from './types';
-import { parseFoodMessage, isGreeting } from './utils/parserMock';
+import { isGreeting } from './utils/parserMock';
 import { EmptyState } from './components/EmptyState';
 import { ChatMessage } from './components/ChatMessage';
 import { ChatInput } from './components/ChatInput';
