@@ -23,6 +23,10 @@ const TEST_CASES = [
     text: "I ate an apple"
   },
   {
+    name: "Greeting text (should return empty items list)",
+    text: "hi"
+  },
+  {
     name: "Empty validation check (should trigger 400)",
     text: ""
   }

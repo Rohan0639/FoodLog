@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import type { Message, FoodItem, DailyGoal } from './types';
-import { parseFoodMessage } from './utils/parserMock';
+import { parseFoodMessage, isGreeting } from './utils/parserMock';
 import { EmptyState } from './components/EmptyState';
 import { ChatMessage } from './components/ChatMessage';
 import { ChatInput } from './components/ChatInput';
@@ -42,8 +42,40 @@ export default function App() {
     scrollToBottom();
   }, [messages, isBotTyping]);
 
+  const parseQuantity = (quantityStr: string | number) => {
+    if (typeof quantityStr === 'number') {
+      return { quantity: quantityStr, unit: 'serving' };
+    }
+    const str = String(quantityStr || '').trim();
+    const match = str.match(/^(\d+(?:\.\d+)?)\s*(.*)$/);
+    if (match) {
+      return {
+        quantity: parseFloat(match[1]),
+        unit: match[2] ? match[2].trim() : 'serving'
+      };
+    }
+    return {
+      quantity: parseFloat(str) || 1,
+      unit: str || 'serving'
+    };
+  };
+
   const handleSendMessage = async (text: string) => {
-    // 1. Add user message
+    // Intercept clear/reset commands
+    const cleanText = text.toLowerCase().trim().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g, "");
+    if (cleanText === 'clear' || cleanText === 'reset') {
+      const userMsg: Message = {
+        id: `user-${Date.now()}`,
+        sender: 'user',
+        text,
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, userMsg]);
+      handleClearAll();
+      return;
+    }
+
+    // Add user message
     const userMsg: Message = {
       id: `user-${Date.now()}`,
       sender: 'user',
@@ -68,40 +100,29 @@ export default function App() {
         throw new Error(`Parser server returned status: ${response.status}`);
       }
 
-      const parseData = await response.json(); // Expected: { foods: [ { name: "banana", quantity: 2, unit: "piece" } ] }
-      const extractedFoods = parseData.foods || [];
+      const parseData = await response.json(); // Expected: { success: true, data: { items: [], totals: {} } }
+      const analyzeData = parseData.data || {};
+      const items = analyzeData.items || [];
+      const totals = analyzeData.totals || { calories: 0, protein: 0, carbs: 0, fat: 0 };
 
       let parsedItems: FoodItem[] = [];
       let replyText = '';
 
-      if (extractedFoods.length > 0) {
-        // 2. Fetch real nutrition details from Spoonacular via backend POST /get-nutrition
-        const nutritionResponse = await fetch(`${API_URL}/get-nutrition`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ foods: extractedFoods }),
+      if (items.length > 0) {
+        parsedItems = items.map((item: any, index: number) => {
+          const { quantity, unit } = parseQuantity(item.quantity);
+          return {
+            id: `food-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
+            name: item.name,
+            quantity,
+            unit,
+            calories: Math.round(item.calories || 0),
+            protein: Math.round((item.protein || 0) * 10) / 10,
+            carbs: Math.round((item.carbs || 0) * 10) / 10,
+            fat: Math.round((item.fat || 0) * 10) / 10,
+            loggedAt: new Date()
+          };
         });
-
-        if (!nutritionResponse.ok) {
-          throw new Error(`Nutrition server returned status: ${nutritionResponse.status}`);
-        }
-
-        const nutritionData = await nutritionResponse.json(); // Expected: { items: [...], total: {...} }
-        const items = nutritionData.items || [];
-
-        parsedItems = items.map((item: any, index: number) => ({
-          id: `food-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
-          name: item.name,
-          quantity: item.quantity,
-          unit: item.unit,
-          calories: item.calories,
-          protein: item.protein,
-          carbs: item.carbs,
-          fat: item.fat,
-          loggedAt: new Date()
-        }));
 
         setFoods((prev) => [...prev, ...parsedItems]);
         
@@ -113,12 +134,16 @@ export default function App() {
           colors: ['#ffffff', '#e4e4e7', '#a1a1aa', '#52525b']
         });
 
-        const totalCalories = nutritionData.total?.calories || 0;
+        const totalCalories = totals.calories || 0;
         const foodNames = parsedItems.map(f => `"${f.name}" (${f.calories} kcal)`).join(', and ');
         
         replyText = `Got it! I parsed and logged ${foodNames}. Added a total of **${totalCalories} calories** to your tracker.`;
       } else {
-        replyText = `I couldn't identify any food items in your message. Could you try describing it differently?`;
+        if (isGreeting(text)) {
+          replyText = `Hello! I'm ready to help you track your food. Just type what you ate, for example: "I had 2 eggs and a banana".`;
+        } else {
+          replyText = `I couldn't identify any food items in your message. Could you try describing it differently?`;
+        }
       }
 
       const botMsg: Message = {
@@ -151,7 +176,11 @@ export default function App() {
         
         replyText = `[Offline Mode] Logged: ${foodNames}. Added **${totalCalories} calories** to your tracker. (Express server is unreachable)`;
       } else {
-        replyText = `I encountered an error connecting to the AI parser, and local fallback parsing failed.`;
+        if (isGreeting(text)) {
+          replyText = `Hello! [Offline Mode] I'm ready to help you track your food. Just type what you ate, for example: "I had 2 eggs and a banana".`;
+        } else {
+          replyText = `I encountered an error connecting to the AI parser, and local fallback parsing failed.`;
+        }
       }
 
       const botMsg: Message = {
