@@ -27,6 +27,10 @@ const TEST_CASES = [
     text: "hi"
   },
   {
+    name: "Input normalization and realistic calorie density check",
+    text: "200 gms rice"
+  },
+  {
     name: "Empty validation check (should trigger 400)",
     text: ""
   }
