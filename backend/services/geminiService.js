@@ -18,6 +18,7 @@ Convert the given food text into structured JSON.
 
 Return ONLY valid JSON in this format:
 {
+  "reply": "A friendly, conversational response to the user. Greet them warmly if they say hi/hello. If they log foods, confirm what you've logged and maybe add a short, helpful health/nutrition tip. If they ask a general question, answer/reply to them helpfuly.",
   "items": [
     {
       "name": "string",
@@ -91,8 +92,8 @@ Sentence: "${foodText.replace(/"/g, '\\"')}"`;
     }
 
     // Validate structured format requirements
-    if (!parsedData.items || !Array.isArray(parsedData.items) || !parsedData.totals) {
-      throw new Error('Response is missing required "items" or "totals" fields.');
+    if (parsedData.reply === undefined || !parsedData.items || !Array.isArray(parsedData.items) || !parsedData.totals) {
+      throw new Error('Response is missing required "reply", "items" or "totals" fields.');
     }
 
     return parsedData;

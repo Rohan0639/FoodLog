@@ -136,10 +136,11 @@ export default function App() {
 
         const totalCalories = totals.calories || 0;
         const foodNames = parsedItems.map(f => `"${f.name}" (${f.calories} kcal)`).join(', and ');
-        
-        replyText = `Got it! I parsed and logged ${foodNames}. Added a total of **${totalCalories} calories** to your tracker.`;
+        replyText = analyzeData.reply || `Got it! I parsed and logged ${foodNames}. Added a total of **${totalCalories} calories** to your tracker.`;
       } else {
-        if (isGreeting(text)) {
+        if (analyzeData.reply) {
+          replyText = analyzeData.reply;
+        } else if (isGreeting(text)) {
           replyText = `Hello! I'm ready to help you track your food. Just type what you ate, for example: "I had 2 eggs and a banana".`;
         } else {
           replyText = `I couldn't identify any food items in your message. Could you try describing it differently?`;
