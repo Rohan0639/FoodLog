@@ -157,39 +157,25 @@ export default function App() {
 
       setMessages((prev) => [...prev, botMsg]);
     } catch (error: any) {
-      console.warn('Failed to communicate with parse-food backend. Falling back to local offline parser...', error);
+      console.warn('Failed to communicate with parse-food backend. Saving raw input locally...', error);
       
-      const parsed = parseFoodMessage(text);
-      let replyText = '';
-      
-      if (parsed.length > 0) {
-        setFoods((prev) => [...prev, ...parsed]);
-        
-        confetti({
-          particleCount: 45,
-          spread: 50,
-          origin: { y: 0.85 },
-          colors: ['#ffffff', '#a1a1aa']
-        });
-
-        const totalCalories = parsed.reduce((acc, curr) => acc + curr.calories, 0);
-        const foodNames = parsed.map(f => `"${f.name}" (${f.calories} kcal)`).join(', and ');
-        
-        replyText = `[Offline Mode] Logged: ${foodNames}. Added **${totalCalories} calories** to your tracker. (Express server is unreachable)`;
-      } else {
-        if (isGreeting(text)) {
-          replyText = `Hello! [Offline Mode] I'm ready to help you track your food. Just type what you ate, for example: "I had 2 eggs and a banana".`;
-        } else {
-          replyText = `I encountered an error connecting to the AI parser, and local fallback parsing failed.`;
-        }
+      // Save raw input text to localStorage
+      try {
+        const existingLogs = JSON.parse(localStorage.getItem('offline_food_logs') || '[]');
+        existingLogs.push({ text, timestamp: new Date().toISOString() });
+        localStorage.setItem('offline_food_logs', JSON.stringify(existingLogs));
+      } catch (storageErr) {
+        console.error('Failed to write to localStorage:', storageErr);
       }
+
+      const replyText = "Saved offline. Will analyze when online.";
 
       const botMsg: Message = {
         id: `bot-fallback-${Date.now()}`,
         sender: 'bot',
         text: replyText,
         timestamp: new Date(),
-        parsedFoods: parsed,
+        parsedFoods: [],
       };
 
       setMessages((prev) => [...prev, botMsg]);

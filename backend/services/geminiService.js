@@ -14,7 +14,10 @@ export async function analyzeFood(foodText) {
   }
 
   const prompt = `You are a nutrition analysis AI.
-Convert the given food text into structured JSON.
+
+IMPORTANT:
+- Quantity refers to TOTAL amount, not servings.
+- 200g means 200 grams total, NOT 200 × 100g.
 
 Return ONLY valid JSON in this format:
 {
@@ -37,7 +40,12 @@ Return ONLY valid JSON in this format:
   }
 }
 
-No explanation. No extra text.
+Use realistic values:
+- Max calories per gram ≤ 9 kcal
+- Ensure macros match calories:
+  calories ≈ (protein×4 + carbs×4 + fat×9)
+
+No explanation. Only JSON.
 
 Sentence: "${foodText.replace(/"/g, '\\"')}"`;
 
@@ -72,23 +80,23 @@ Sentence: "${foodText.replace(/"/g, '\\"')}"`;
     }
 
     const rawText = candidates[0].content?.parts[0]?.text;
-    if (!rawText) {
-      throw new Error('Empty response content received from Gemini.');
-    }
+    console.log(`[Gemini Response Log] Raw Text:\n${rawText}`);
 
-    // Attempt to parse JSON response directly
+    // Safe JSON Parsing: Extract and parse safely
     let parsedData;
     try {
-      parsedData = JSON.parse(rawText.trim());
-    } catch (parseErr) {
-      console.warn('Direct JSON parsing failed. Attempting sanitization...', parseErr);
+      const text = (rawText || '').trim();
+      const firstBrace = text.indexOf('{');
+      const lastBrace = text.lastIndexOf('}');
       
-      // Fallback clean up of markdown wrappers if Gemini returned them
-      const cleanJsonText = rawText
-        .replace(/```json/gi, '')
-        .replace(/```/g, '')
-        .trim();
-      parsedData = JSON.parse(cleanJsonText);
+      if (firstBrace === -1 || lastBrace === -1 || lastBrace < firstBrace) {
+        throw new SyntaxError("Could not find valid JSON object markers in response text");
+      }
+      
+      const jsonSubstring = text.substring(firstBrace, lastBrace + 1);
+      parsedData = JSON.parse(jsonSubstring);
+    } catch (parseErr) {
+      throw new SyntaxError(`JSON Parsing failed: ${parseErr.message}`);
     }
 
     // Validate structured format requirements
