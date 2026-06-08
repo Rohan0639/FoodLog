@@ -1,7 +1,7 @@
 import axios from 'axios';
 import config from '../config.js';
 
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent';
 
 /**
  * Sends a natural language food log to Gemini API for nutrition analysis.
