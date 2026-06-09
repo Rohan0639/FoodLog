@@ -5,20 +5,19 @@ import foodRouter from './routes/food.js';
 
 const app = express();
 
-// Allow requests from the Vercel frontend and local dev servers
-const allowedOrigins = [
-  'https://food-log-cjy2.vercel.app',
-  /^http:\/\/localhost:\d+$/,
-  /^http:\/\/127\.0\.0\.1:\d+$/
-];
+// Allow requests from configured frontend URL + any vercel.app preview + localhost
+const FRONTEND_URL = process.env.FRONTEND_URL || '';
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (curl, mobile apps, Postman)
+    // Allow no-origin requests (curl, Postman, mobile apps)
     if (!origin) return callback(null, true);
-    const allowed = allowedOrigins.some(o =>
-      typeof o === 'string' ? o === origin : o.test(origin)
-    );
-    if (allowed) return callback(null, true);
+    // Allow localhost and 127.0.0.1 for local dev
+    if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return callback(null, true);
+    // Allow any *.vercel.app subdomain (handles preview deployments too)
+    if (/^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(origin)) return callback(null, true);
+    // Allow explicitly configured frontend URL
+    if (FRONTEND_URL && origin === FRONTEND_URL) return callback(null, true);
+    console.warn(`[CORS] Blocked origin: ${origin}`);
     return callback(new Error(`CORS: origin '${origin}' not allowed`));
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
