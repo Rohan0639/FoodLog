@@ -8,6 +8,8 @@ export interface FoodItem {
   carbs: number;
   fats: number;
   createdAt: string;
+  baseQuantity?: number;
+  baseUnit?: string;
 }
 
 export interface FoodEntry {
@@ -22,6 +24,8 @@ export interface FoodEntry {
   createdAt: string;
   isOffline?: boolean;
   isOfflineUpdated?: boolean;
+  baseQuantity?: number;
+  baseUnit?: string;
 }
 
 export interface ParsedItem {
@@ -73,6 +77,9 @@ export interface Message {
   timestamp: Date;
   isTyping?: boolean;
   parsedFoods?: FoodItem[];
+  pendingFoods?: FoodEntry[];
+  isConfirmed?: boolean;
+  isDiscarded?: boolean;
 }
 
 export interface NutritionSummary {

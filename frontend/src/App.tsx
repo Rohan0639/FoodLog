@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import type { Message, DailyGoal, OfflineAction, FoodEntry } from './types';
+import { convertUnit } from './utils/unitConverter';
 import { EmptyState } from './components/EmptyState';
 import { ChatMessage } from './components/ChatMessage';
 import { ChatInput } from './components/ChatInput';
@@ -48,6 +49,9 @@ export default function App() {
 
   const [isBotTyping, setIsBotTyping] = useState(false);
   const [isDashboardOpenMobile, setIsDashboardOpenMobile] = useState(false);
+
+  const [activeFoods, setActiveFoods] = useState<FoodEntry[]>([]);
+  const [activeReviewMessageId, setActiveReviewMessageId] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -284,39 +288,23 @@ export default function App() {
 
       const parseData = await response.json(); // Expected: { success: true, reply: "...", data: [FoodEntry1, ...] }
       const newEntries: FoodEntry[] = parseData.data || [];
-      const replyText = parseData.reply || `Logged!`;
+      const replyText = parseData.reply || `Please review the parsed food items:`;
 
-      if (newEntries.length > 0) {
-        setLogs((prev) => [...newEntries, ...prev]);
-        
-        // Confetti celebration
-        confetti({
-          particleCount: 80,
-          spread: 60,
-          origin: { y: 0.85 },
-          colors: ['#ffffff', '#e4e4e7', '#a1a1aa', '#52525b']
-        });
-      }
-
+      const botMsgId = generateMessageId('bot');
       const botMsg: Message = {
-        id: generateMessageId('bot'),
+        id: botMsgId,
         sender: 'bot',
         text: replyText,
         timestamp: getCurrentDate(),
-        parsedFoods: newEntries.map((e) => ({
-          id: e.id,
-          name: e.name,
-          quantity: e.quantity,
-          unit: e.unit,
-          calories: e.calories,
-          protein: e.protein,
-          carbs: e.carbs,
-          fats: e.fats,
-          createdAt: e.createdAt
-        })),
+        pendingFoods: newEntries.length > 0 ? newEntries : undefined,
       };
 
       setMessages((prev) => [...prev, botMsg]);
+
+      if (newEntries.length > 0) {
+        setActiveReviewMessageId(botMsgId);
+        setActiveFoods(newEntries);
+      }
     } catch (error) {
       const err = error as Error;
       console.warn('Failed to communicate with parse-food backend. Saving raw input locally...', err);
@@ -364,6 +352,116 @@ export default function App() {
     } finally {
       setIsBotTyping(false);
     }
+  };
+
+  const handleConfirmLog = async () => {
+    if (activeFoods.length === 0) return;
+    setIsBotTyping(true);
+
+    try {
+      // Finalize and scale macro calculations for each food item
+      const finalizedFoods = activeFoods.map((item) => {
+        const quantity = item.quantity;
+        let scaled = { calories: item.calories, protein: item.protein, carbs: item.carbs, fats: item.fats };
+        
+        if (quantity > 0 && !isNaN(quantity)) {
+          try {
+            const baseUnit = item.baseUnit || item.unit;
+            const baseQty = item.baseQuantity || item.quantity;
+            const scaledQuantity = convertUnit(quantity, item.unit, baseUnit, item.name);
+            const scale = scaledQuantity / baseQty;
+
+            scaled = {
+              calories: Math.max(0, Math.round(item.calories * scale)),
+              protein: Math.max(0, Math.round(item.protein * scale * 10) / 10),
+              carbs: Math.max(0, Math.round(item.carbs * scale * 10) / 10),
+              fats: Math.max(0, Math.round(item.fats * scale * 10) / 10),
+            };
+          } catch (err) {
+            console.error('Scale error:', err);
+          }
+        }
+
+        return {
+          id: item.id,
+          name: item.name,
+          quantity: item.quantity,
+          unit: item.unit,
+          calories: scaled.calories,
+          protein: scaled.protein,
+          carbs: scaled.carbs,
+          fats: scaled.fats,
+          createdAt: item.createdAt || new Date().toISOString()
+        };
+      });
+
+      // Send batch save to database
+      const response = await fetch(`${API_URL}/food/batch`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ foods: finalizedFoods }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server batch log returned status: ${response.status}`);
+      }
+
+      const responseData = await response.json();
+      const savedEntries: FoodEntry[] = responseData.data || finalizedFoods;
+
+      // Update logs
+      setLogs((prev) => [...savedEntries, ...prev]);
+
+      // Confetti celebration
+      confetti({
+        particleCount: 80,
+        spread: 60,
+        origin: { y: 0.85 },
+        colors: ['#ffffff', '#e4e4e7', '#a1a1aa', '#52525b']
+      });
+
+      // Update the active review message in the chat history
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === activeReviewMessageId
+            ? {
+                ...msg,
+                text: "Logged successfully! 🍳",
+                pendingFoods: undefined,
+                parsedFoods: savedEntries
+              }
+            : msg
+        )
+      );
+    } catch (err) {
+      console.error('Failed to confirm and log food:', err);
+    } finally {
+      // Clear state
+      setActiveReviewMessageId(null);
+      setActiveFoods([]);
+      setIsBotTyping(false);
+    }
+  };
+
+  const handleDiscard = () => {
+    if (activeReviewMessageId) {
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === activeReviewMessageId
+            ? {
+                ...msg,
+                text: "Discarded logging session. ❌",
+                pendingFoods: undefined,
+                parsedFoods: []
+              }
+            : msg
+        )
+      );
+    }
+    setActiveReviewMessageId(null);
+    setActiveFoods([]);
   };
 
   const handleDeleteFoodEntry = async (id: string) => {
@@ -584,7 +682,15 @@ export default function App() {
           ) : (
             <div className="flex flex-col gap-1">
               {messages.map((message) => (
-                <ChatMessage key={message.id} message={message} />
+                <ChatMessage
+                  key={message.id}
+                  message={message}
+                  activeFoods={message.id === activeReviewMessageId ? activeFoods : undefined}
+                  setActiveFoods={message.id === activeReviewMessageId ? setActiveFoods : undefined}
+                  onConfirm={message.id === activeReviewMessageId ? handleConfirmLog : undefined}
+                  onDiscard={message.id === activeReviewMessageId ? handleDiscard : undefined}
+                  isActionDisabled={isBotTyping}
+                />
               ))}
               
               {/* Bot typing simulation */}
@@ -605,7 +711,7 @@ export default function App() {
         </div>
 
         {/* Bottom Input Area */}
-        <ChatInput onSendMessage={handleSendMessage} disabled={isBotTyping} />
+        <ChatInput onSendMessage={handleSendMessage} disabled={isBotTyping || !!activeReviewMessageId} />
       </div>
 
       {/* RIGHT AREA: Nutrition Dashboard (Desktop: sidebar, Mobile: toggle slide-over drawer) */}

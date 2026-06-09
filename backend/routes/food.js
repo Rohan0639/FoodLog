@@ -1,4 +1,5 @@
 import express from 'express';
+import crypto from 'crypto';
 import { analyzeFood } from '../services/geminiService.js';
 import { saveFoodLog, getFoodLogs, updateFoodLog, deleteFoodLog, saveFoodEntry, getFoodEntries, updateFoodEntry, deleteFoodEntry, clearAllFoodEntries } from '../services/dbService.js';
 
@@ -224,25 +225,24 @@ router.post('/parse-food', validateParseRequest, async (req, res) => {
       
       // Perform universal safety checks
       validateGeminiResponse(normalizedInput, result);
-      
-      // Store individual items in food_entries table
+      // Construct draft food entries without saving to the database
       const items = result.items || [];
-      const savedEntries = [];
+      const draftEntries = [];
       
       for (const item of items) {
         const { quantity, unit } = parseQuantityAndUnit(item.quantity);
-        const entry = saveFoodEntry({
+        draftEntries.push({
+          id: crypto.randomUUID(),
           name: item.name || 'Unknown',
           quantity,
           unit,
+          baseQuantity: quantity,
+          baseUnit: unit,
           calories: item.calories || 0,
           protein: item.protein || 0,
           carbs: item.carbs || 0,
           fats: item.fat || 0
         });
-        if (entry) {
-          savedEntries.push(entry);
-        }
       }
 
       // Also save fallback logs for safety
@@ -255,7 +255,7 @@ router.post('/parse-food', validateParseRequest, async (req, res) => {
       return res.json({
         success: true,
         reply: result.reply || `Logged your food!`,
-        data: savedEntries
+        data: draftEntries
       });
     } catch (error) {
       console.warn(`[Validation/API Failure] Attempt ${attempts} failed: ${error.message}`);
@@ -469,6 +469,54 @@ router.delete('/log/:id', (req, res) => {
       success: false,
       error: "Database Error",
       message: "Unable to delete food entry.",
+      detail: error.message
+    });
+  }
+});
+
+/**
+ * POST /food/batch
+ * Request body: { foods: [ { name, quantity, unit, calories, protein, carbs, fats }, ... ] }
+ */
+router.post('/food/batch', (req, res) => {
+  const { foods } = req.body;
+  if (!Array.isArray(foods)) {
+    return res.status(400).json({
+      success: false,
+      error: "Bad Request",
+      message: "The request body must contain a 'foods' array."
+    });
+  }
+
+  try {
+    const savedEntries = [];
+    for (const food of foods) {
+      const entry = saveFoodEntry({
+        id: food.id,
+        name: food.name,
+        quantity: parseFloat(food.quantity),
+        unit: food.unit,
+        calories: parseFloat(food.calories),
+        protein: parseFloat(food.protein),
+        carbs: parseFloat(food.carbs),
+        fats: parseFloat(food.fats),
+        createdAt: food.createdAt || new Date().toISOString()
+      });
+      if (entry) {
+        savedEntries.push(entry);
+      }
+    }
+
+    return res.json({
+      success: true,
+      data: savedEntries
+    });
+  } catch (error) {
+    console.error('[POST /food/batch Error]:', error);
+    return res.status(500).json({
+      success: false,
+      error: "Database Error",
+      message: "Unable to save food entries.",
       detail: error.message
     });
   }
