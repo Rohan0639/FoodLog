@@ -5,8 +5,26 @@ import foodRouter from './routes/food.js';
 
 const app = express();
 
-// Enable Cross-Origin Resource Sharing for frontend integration
-app.use(cors());
+// Allow requests from the Vercel frontend and local dev servers
+const allowedOrigins = [
+  'https://food-log-cjy2.vercel.app',
+  /^http:\/\/localhost:\d+$/,
+  /^http:\/\/127\.0\.0\.1:\d+$/
+];
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (curl, mobile apps, Postman)
+    if (!origin) return callback(null, true);
+    const allowed = allowedOrigins.some(o =>
+      typeof o === 'string' ? o === origin : o.test(origin)
+    );
+    if (allowed) return callback(null, true);
+    return callback(new Error(`CORS: origin '${origin}' not allowed`));
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+}));
 
 // Parse incoming JSON payloads
 app.use(express.json());

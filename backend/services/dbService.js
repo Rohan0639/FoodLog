@@ -1,4 +1,4 @@
-import { DatabaseSync } from 'node:sqlite';
+import Database from 'better-sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
@@ -8,21 +8,20 @@ const __dirname = path.dirname(__filename);
 
 let db = null;
 
-// Resolve database path (uses /tmp on Vercel to bypass read-only filesystem limitations)
+// Resolve database path — /tmp on ephemeral hosts, local otherwise
 const dbPath = process.env.VERCEL
   ? '/tmp/foodlog.db'
   : path.join(__dirname, '..', 'foodlog.db');
 
 try {
   console.log(`[Database] Initializing SQLite database at: ${dbPath}`);
-  db = new DatabaseSync(dbPath);
+  db = new Database(dbPath);
 
-  // Check schema version or perform migrations
+  // Check schema version — detect old column layout
   let needsRecreate = false;
   try {
     const tableInfo = db.prepare("PRAGMA table_info(food_logs)").all();
     if (tableInfo.length > 0) {
-      // Check if old columns exist
       const hasId = tableInfo.some(col => col.name === '_id');
       const hasRawInput = tableInfo.some(col => col.name === 'raw_input');
       if (!hasId || hasRawInput) {
@@ -38,7 +37,6 @@ try {
     db.exec(`DROP TABLE IF EXISTS food_logs`);
   }
 
-  // Initialize logs table schema
   db.exec(`
     CREATE TABLE IF NOT EXISTS food_logs (
       _id TEXT PRIMARY KEY,
@@ -133,8 +131,7 @@ export function updateFoodLog(id, foodText, parsedData) {
 
   try {
     const updatedAt = new Date().toISOString();
-    
-    // Check if record exists
+
     const checkQuery = db.prepare('SELECT _id, userId, createdAt FROM food_logs WHERE _id = ?');
     const record = checkQuery.get(id);
     if (!record) {
@@ -148,7 +145,7 @@ export function updateFoodLog(id, foodText, parsedData) {
     `);
     updateStmt.run(foodText, JSON.stringify(parsedData), updatedAt, id);
     console.log(`[Database] Successfully updated food log: ${id}`);
-    
+
     return {
       _id: id,
       userId: record.userId,
@@ -189,4 +186,3 @@ export function deleteFoodLog(id) {
     throw error;
   }
 }
-

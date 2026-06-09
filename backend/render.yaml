@@ -11,6 +11,8 @@ services:
     envVars:
       - key: PORT
         value: 10000
+      - key: NODE_VERSION
+        value: "20"
       - key: GEMINI_API_KEY
         sync: false
       - key: SPOONACULAR_API_KEY
