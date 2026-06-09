@@ -31,6 +31,7 @@ A full-stack, monochromatic web application designed to log your daily meals and
    Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ## Deployment
+using verccel to deploy the project
 
 Deploy the project as two separate applications on Vercel:
 - **Backend**: Set the root directory to `backend/` and configure `GEMINI_API_KEY` in env variables. Database storage will seamlessly fallback to write to Vercel's ephemeral `/tmp` directory.
