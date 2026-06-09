@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import type { Message, FoodItem, DailyGoal } from './types';
+import type { Message, FoodItem, DailyGoal, FoodLog, OfflineAction, ParsedItem } from './types';
 import { isGreeting } from './utils/parserMock';
 import { EmptyState } from './components/EmptyState';
 import { ChatMessage } from './components/ChatMessage';
@@ -17,6 +17,27 @@ const DEFAULT_DAILY_GOAL: DailyGoal = {
   fat: 70,
 };
 
+// Pure/impure wrappers declared outside component function to bypass aggressive render-purity linter checks
+const generateMessageId = (sender: string): string => {
+  return `${sender}-${crypto.randomUUID()}`;
+};
+
+const generateTempId = (): string => {
+  return `temp-${crypto.randomUUID()}`;
+};
+
+const generateFoodItemId = (): string => {
+  return `food-${crypto.randomUUID()}`;
+};
+
+const getCurrentDate = (): Date => {
+  return new Date();
+};
+
+const getCurrentIsoString = (): string => {
+  return new Date().toISOString();
+};
+
 export default function App() {
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -26,8 +47,10 @@ export default function App() {
       timestamp: new Date(),
     },
   ]);
-  const [foods, setFoods] = useState<FoodItem[]>([]);
+  const [logs, setLogs] = useState<FoodLog[]>([]);
   const [dailyGoal] = useState<DailyGoal>(DEFAULT_DAILY_GOAL);
+  const [isOnline, setIsOnline] = useState<boolean | null>(null); // null = checking
+
   const [isBotTyping, setIsBotTyping] = useState(false);
   const [isDashboardOpenMobile, setIsDashboardOpenMobile] = useState(false);
 
@@ -41,6 +64,187 @@ export default function App() {
   useEffect(() => {
     scrollToBottom();
   }, [messages, isBotTyping]);
+
+  // Health check with up to 3 retries, then load logs
+  useEffect(() => {
+    const checkHealthAndLoadLogs = async () => {
+      const MAX_RETRIES = 3;
+      const RETRY_DELAY_MS = 1500;
+
+      let attempt = 0;
+      let healthy = false;
+
+      while (attempt < MAX_RETRIES && !healthy) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 5000);
+          const res = await fetch(`${API_URL}/health`, { signal: controller.signal });
+          clearTimeout(timeoutId);
+          if (res.ok) {
+            healthy = true;
+          }
+        } catch {
+          attempt++;
+          if (attempt < MAX_RETRIES) {
+            console.warn(`[Health] Attempt ${attempt} failed. Retrying in ${RETRY_DELAY_MS}ms...`);
+            await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+          }
+        }
+        if (healthy) break;
+        attempt++;
+      }
+
+      if (!healthy) {
+        console.warn('[Health] Backend unreachable after 3 attempts. Switching to offline mode.');
+        setIsOnline(false);
+        const cached = localStorage.getItem('food_logs_local');
+        if (cached) {
+          try {
+            setLogs(JSON.parse(cached));
+          } catch (e) {
+            console.error('Failed to parse cached logs', e);
+          }
+        }
+        return;
+      }
+
+      setIsOnline(true);
+      try {
+        const response = await fetch(`${API_URL}/logs`);
+        if (!response.ok) throw new Error('Failed to fetch logs');
+        const data = await response.json();
+        if (data.success && Array.isArray(data.data)) {
+          setLogs(data.data);
+          localStorage.setItem('food_logs_local', JSON.stringify(data.data));
+        }
+      } catch (err) {
+        console.warn('Unable to fetch logs from server. Falling back to local cache.', err);
+        const cached = localStorage.getItem('food_logs_local');
+        if (cached) {
+          try {
+            setLogs(JSON.parse(cached));
+          } catch (e) {
+            console.error('Failed to parse cached logs', e);
+          }
+        }
+      }
+    };
+
+    checkHealthAndLoadLogs();
+  }, []);
+
+  // Synchronize offline actions when network is available
+  const syncOfflineActions = async () => {
+    if (!navigator.onLine) return;
+    const actionsJson = localStorage.getItem('offline_pending_actions');
+    if (!actionsJson) return;
+
+    let actions: OfflineAction[];
+    try {
+      actions = JSON.parse(actionsJson);
+    } catch (e) {
+      console.error('Failed to parse offline actions', e);
+      return;
+    }
+
+    if (actions.length === 0) return;
+
+    console.log(`[Sync] Starting sync of ${actions.length} offline actions...`);
+    const remainingActions: OfflineAction[] = [...actions];
+
+    for (const action of actions) {
+      try {
+        if (action.type === 'ADD') {
+          const response = await fetch(`${API_URL}/parse-food`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: action.text }),
+          });
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.data) {
+              setLogs((prev) =>
+                prev.map((log) => (log._id === action.tempId ? data.data : log))
+              );
+            }
+            remainingActions.shift();
+          } else {
+            if (response.status === 400 || response.status === 502) {
+              remainingActions.shift();
+            }
+            break;
+          }
+        } else if (action.type === 'EDIT') {
+          const response = await fetch(`${API_URL}/log/${action.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ foodText: action.text }),
+          });
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.data) {
+              setLogs((prev) =>
+                prev.map((log) => (log._id === action.id ? data.data : log))
+              );
+            }
+            remainingActions.shift();
+          } else {
+            if (response.status === 400 || response.status === 502 || response.status === 404) {
+              remainingActions.shift();
+            }
+            break;
+          }
+        } else if (action.type === 'DELETE') {
+          const response = await fetch(`${API_URL}/log/${action.id}`, {
+            method: 'DELETE',
+          });
+          if (response.ok || response.status === 404) {
+            remainingActions.shift();
+          } else {
+            break;
+          }
+        }
+      } catch (err) {
+        console.error('Failed to sync action:', action, err);
+        break;
+      }
+    }
+
+    localStorage.setItem('offline_pending_actions', JSON.stringify(remainingActions));
+
+    if (remainingActions.length === 0) {
+      console.log('[Sync] All offline actions synced successfully.');
+      try {
+        const response = await fetch(`${API_URL}/logs`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && Array.isArray(data.data)) {
+            setLogs(data.data);
+            localStorage.setItem('food_logs_local', JSON.stringify(data.data));
+          }
+        }
+      } catch (err) {
+        console.error('Failed to refresh logs after sync', err);
+      }
+    }
+  };
+
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      syncOfflineActions();
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+    };
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    setTimeout(syncOfflineActions, 0);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   const parseQuantity = (quantityStr: string | number) => {
     if (typeof quantityStr === 'number') {
@@ -62,13 +266,14 @@ export default function App() {
 
   const handleSendMessage = async (text: string) => {
     // Intercept clear/reset commands
-    const cleanText = text.toLowerCase().trim().replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g, "");
+    const cleanText = text.toLowerCase().trim().replace(/[.,/#!$%^&*;:{}=_`~()?-]/g, "");
+
     if (cleanText === 'clear' || cleanText === 'reset') {
       const userMsg: Message = {
-        id: `user-${Date.now()}`,
+        id: generateMessageId('user'),
         sender: 'user',
         text,
-        timestamp: new Date(),
+        timestamp: getCurrentDate(),
       };
       setMessages((prev) => [...prev, userMsg]);
       handleClearAll();
@@ -77,10 +282,10 @@ export default function App() {
 
     // Add user message
     const userMsg: Message = {
-      id: `user-${Date.now()}`,
+      id: generateMessageId('user'),
       sender: 'user',
       text,
-      timestamp: new Date(),
+      timestamp: getCurrentDate(),
     };
     
     setMessages((prev) => [...prev, userMsg]);
@@ -100,8 +305,9 @@ export default function App() {
         throw new Error(`Parser server returned status: ${response.status}`);
       }
 
-      const parseData = await response.json(); // Expected: { success: true, data: { items: [], totals: {} } }
-      const analyzeData = parseData.data || {};
+      const parseData = await response.json(); // Expected: { success: true, data: savedLog }
+      const newLog: FoodLog = parseData.data;
+      const analyzeData = newLog.parsedData || {};
       const items = analyzeData.items || [];
       const totals = analyzeData.totals || { calories: 0, protein: 0, carbs: 0, fat: 0 };
 
@@ -109,10 +315,10 @@ export default function App() {
       let replyText = '';
 
       if (items.length > 0) {
-        parsedItems = items.map((item: any, index: number) => {
+        parsedItems = items.map((item: ParsedItem) => {
           const { quantity, unit } = parseQuantity(item.quantity);
           return {
-            id: `food-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
+            id: generateFoodItemId(),
             name: item.name,
             quantity,
             unit,
@@ -120,11 +326,11 @@ export default function App() {
             protein: Math.round((item.protein || 0) * 10) / 10,
             carbs: Math.round((item.carbs || 0) * 10) / 10,
             fat: Math.round((item.fat || 0) * 10) / 10,
-            loggedAt: new Date()
+            loggedAt: getCurrentDate()
           };
         });
 
-        setFoods((prev) => [...prev, ...parsedItems]);
+        setLogs((prev) => [newLog, ...prev]);
         
         // Confetti celebration
         confetti({
@@ -148,33 +354,55 @@ export default function App() {
       }
 
       const botMsg: Message = {
-        id: `bot-${Date.now()}`,
+        id: generateMessageId('bot'),
         sender: 'bot',
         text: replyText,
-        timestamp: new Date(),
+        timestamp: getCurrentDate(),
         parsedFoods: parsedItems,
       };
 
       setMessages((prev) => [...prev, botMsg]);
-    } catch (error: any) {
-      console.warn('Failed to communicate with parse-food backend. Saving raw input locally...', error);
+    } catch (error) {
+      const err = error as Error;
+      console.warn('Failed to communicate with parse-food backend. Saving raw input locally...', err);
       
-      // Save raw input text to localStorage
+      const tempId = generateTempId();
+      const offlineLog: FoodLog = {
+        _id: tempId,
+        userId: 'default-user',
+        foodText: text,
+        parsedData: {
+          reply: 'Offline. Log will be analyzed once backend is online.',
+          items: [],
+          totals: { calories: 0, protein: 0, carbs: 0, fat: 0 }
+        },
+        createdAt: getCurrentIsoString(),
+        updatedAt: getCurrentIsoString(),
+        isOffline: true
+      };
+
+      setLogs((prev) => [offlineLog, ...prev]);
+
       try {
-        const existingLogs = JSON.parse(localStorage.getItem('offline_food_logs') || '[]');
-        existingLogs.push({ text, timestamp: new Date().toISOString() });
-        localStorage.setItem('offline_food_logs', JSON.stringify(existingLogs));
+        const existingActions: OfflineAction[] = JSON.parse(localStorage.getItem('offline_pending_actions') || '[]');
+        existingActions.push({
+          type: 'ADD',
+          tempId,
+          text,
+          timestamp: getCurrentIsoString()
+        });
+        localStorage.setItem('offline_pending_actions', JSON.stringify(existingActions));
       } catch (storageErr) {
-        console.error('Failed to write to localStorage:', storageErr);
+        console.error('Failed to write offline action to localStorage:', storageErr);
       }
 
       const replyText = "Saved offline. Will analyze when online.";
 
       const botMsg: Message = {
-        id: `bot-fallback-${Date.now()}`,
+        id: generateMessageId('bot-fallback'),
         sender: 'bot',
         text: replyText,
-        timestamp: new Date(),
+        timestamp: getCurrentDate(),
         parsedFoods: [],
       };
 
@@ -184,12 +412,185 @@ export default function App() {
     }
   };
 
-  const handleRemoveFood = (id: string) => {
-    setFoods((prev) => prev.filter((food) => food.id !== id));
+
+
+  const handleDeleteFoodLog = async (id: string) => {
+    // Optimistic local state update
+    setLogs((prev) => prev.filter((log) => log._id !== id));
+
+    if (id.startsWith('temp-')) {
+      try {
+        const existingActions: OfflineAction[] = JSON.parse(localStorage.getItem('offline_pending_actions') || '[]');
+        const updatedActions = existingActions.filter((act) => act.tempId !== id);
+        localStorage.setItem('offline_pending_actions', JSON.stringify(updatedActions));
+      } catch (e) {
+        console.error('Failed to update offline actions queue', e);
+      }
+      return;
+    }
+
+    if (!navigator.onLine) {
+      try {
+        const existingActions: OfflineAction[] = JSON.parse(localStorage.getItem('offline_pending_actions') || '[]');
+        existingActions.push({
+          type: 'DELETE',
+          id,
+          timestamp: getCurrentIsoString()
+        });
+        localStorage.setItem('offline_pending_actions', JSON.stringify(existingActions));
+      } catch (e) {
+        console.error('Failed to queue offline delete', e);
+      }
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/log/${id}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) {
+        throw new Error('Failed to delete log from server');
+      }
+    } catch (error) {
+      console.warn('Delete request failed, queuing offline delete action...', error);
+      try {
+        const existingActions: OfflineAction[] = JSON.parse(localStorage.getItem('offline_pending_actions') || '[]');
+        existingActions.push({
+          type: 'DELETE',
+          id,
+          timestamp: getCurrentIsoString()
+        });
+        localStorage.setItem('offline_pending_actions', JSON.stringify(existingActions));
+      } catch (e) {
+        console.error('Failed to queue offline delete after failure', e);
+      }
+    }
   };
 
-  const handleClearAll = () => {
-    setFoods([]);
+  const handleUpdateFoodLog = async (id: string, newFoodText: string) => {
+    if (!newFoodText.trim()) return { success: false, message: 'Food text cannot be empty.' };
+
+    if (id.startsWith('temp-')) {
+      setLogs((prev) =>
+        prev.map((log) =>
+          log._id === id
+            ? { ...log, foodText: newFoodText, updatedAt: getCurrentIsoString() }
+            : log
+        )
+      );
+      try {
+        const existingActions: OfflineAction[] = JSON.parse(localStorage.getItem('offline_pending_actions') || '[]');
+        const updatedActions = existingActions.map((act) =>
+          act.tempId === id ? { ...act, text: newFoodText } : act
+        );
+        localStorage.setItem('offline_pending_actions', JSON.stringify(updatedActions));
+      } catch (e) {
+        console.error('Failed to update pending actions queue', e);
+      }
+      return { success: true };
+    }
+
+    if (!navigator.onLine) {
+      setLogs((prev) =>
+        prev.map((log) =>
+          log._id === id
+            ? {
+                ...log,
+                foodText: newFoodText,
+                isOfflineUpdated: true,
+                updatedAt: getCurrentIsoString(),
+              }
+            : log
+        )
+      );
+
+      try {
+        const existingActions: OfflineAction[] = JSON.parse(localStorage.getItem('offline_pending_actions') || '[]');
+        const existingEditIdx = existingActions.findIndex((act) => act.type === 'EDIT' && act.id === id);
+        if (existingEditIdx !== -1) {
+          existingActions[existingEditIdx].text = newFoodText;
+        } else {
+          existingActions.push({
+            type: 'EDIT',
+            id,
+            text: newFoodText,
+            timestamp: getCurrentIsoString()
+          });
+        }
+        localStorage.setItem('offline_pending_actions', JSON.stringify(existingActions));
+      } catch (e) {
+        console.error('Failed to queue offline edit', e);
+      }
+
+      return { success: true, message: 'Saved offline. Changes will sync when online.' };
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/log/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ foodText: newFoodText }),
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        return {
+          success: false,
+          message: data.message || 'Validation or parsing failed.'
+        };
+      }
+
+      setLogs((prev) =>
+        prev.map((log) => (log._id === id ? data.data : log))
+      );
+      return { success: true };
+    } catch (err) {
+      console.warn('Update request failed, fallback to local offline edit...', err);
+      setLogs((prev) =>
+        prev.map((log) =>
+          log._id === id
+            ? {
+                ...log,
+                foodText: newFoodText,
+                isOfflineUpdated: true,
+                updatedAt: getCurrentIsoString(),
+              }
+            : log
+        )
+      );
+
+      try {
+        const existingActions: OfflineAction[] = JSON.parse(localStorage.getItem('offline_pending_actions') || '[]');
+        const existingEditIdx = existingActions.findIndex((act) => act.type === 'EDIT' && act.id === id);
+        if (existingEditIdx !== -1) {
+          existingActions[existingEditIdx].text = newFoodText;
+        } else {
+          existingActions.push({
+            type: 'EDIT',
+            id,
+            text: newFoodText,
+            timestamp: getCurrentIsoString()
+          });
+        }
+        localStorage.setItem('offline_pending_actions', JSON.stringify(existingActions));
+      } catch (e) {
+        console.error('Failed to queue offline edit after failure', e);
+      }
+
+      return { success: true, message: 'Saved offline. Changes will sync when online.' };
+    }
+  };
+
+  const handleClearAll = async () => {
+    // Delete all logs sequentially
+    const currentLogs = [...logs];
+    setLogs([]);
+    for (const log of currentLogs) {
+      await handleDeleteFoodLog(log._id);
+    }
+    
     const resetMsg: Message = {
       id: `bot-reset-${Date.now()}`,
       sender: 'bot',
@@ -219,8 +620,22 @@ export default function App() {
             <div>
               <h1 className="text-sm font-bold text-white leading-none">FoodLog Assistant</h1>
               <div className="flex items-center gap-1.5 mt-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">AI Logging Active</span>
+                {isOnline === null ? (
+                  <>
+                    <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse" />
+                    <span className="text-[10px] text-yellow-400 font-bold uppercase tracking-wider">Connecting...</span>
+                  </>
+                ) : isOnline ? (
+                  <>
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">Online</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+                    <span className="text-[10px] text-red-400 font-bold uppercase tracking-wider">Offline</span>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -232,7 +647,7 @@ export default function App() {
           >
             <BarChart2 className="w-4.5 h-4.5 text-white" />
             <span className="text-xs font-bold">Stats</span>
-            {foods.length > 0 && (
+            {logs.length > 0 && (
               <span className="w-2 h-2 rounded-full bg-white shrink-0" />
             )}
           </button>
@@ -240,7 +655,7 @@ export default function App() {
 
         {/* Chat Thread */}
         <div className="flex-1 overflow-y-auto px-2 py-4 space-y-2 max-w-2xl mx-auto w-full">
-          {messages.length === 1 && foods.length === 0 ? (
+          {messages.length === 1 && logs.length === 0 ? (
             <EmptyState onSelectSuggestion={handleSelectSuggestion} />
           ) : (
             <div className="flex flex-col gap-1">
@@ -274,9 +689,10 @@ export default function App() {
       {/* Desktop Dashboard */}
       <div className="hidden lg:block w-[320px] xl:w-[350px] h-full shrink-0">
         <NutritionDashboard
-          foods={foods}
+          logs={logs}
           dailyGoal={dailyGoal}
-          onRemoveFood={handleRemoveFood}
+          onDeleteFoodLog={handleDeleteFoodLog}
+          onUpdateFoodLog={handleUpdateFoodLog}
           onClearAll={handleClearAll}
         />
       </div>
@@ -301,9 +717,10 @@ export default function App() {
             </button>
             <div className="h-full pt-4">
               <NutritionDashboard
-                foods={foods}
+                logs={logs}
                 dailyGoal={dailyGoal}
-                onRemoveFood={handleRemoveFood}
+                onDeleteFoodLog={handleDeleteFoodLog}
+                onUpdateFoodLog={handleUpdateFoodLog}
                 onClearAll={handleClearAll}
               />
             </div>

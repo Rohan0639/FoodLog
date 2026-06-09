@@ -1,8 +1,9 @@
 import express from 'express';
 import { analyzeFood } from '../services/geminiService.js';
-import { saveFoodLog } from '../services/dbService.js';
+import { saveFoodLog, getFoodLogs, updateFoodLog, deleteFoodLog } from '../services/dbService.js';
 
 const router = express.Router();
+
 
 // 1. Input Normalization Helper
 function normalizeFoodInput(text) {
@@ -136,6 +137,28 @@ const validateParseRequest = (req, res, next) => {
 };
 
 /**
+ * GET /logs
+ * Returns all saved food logs
+ */
+router.get('/logs', (req, res) => {
+  try {
+    const logs = getFoodLogs();
+    return res.json({
+      success: true,
+      data: logs
+    });
+  } catch (error) {
+    console.error('[GET /logs Error]:', error);
+    return res.status(500).json({
+      success: false,
+      error: "Database Error",
+      message: "Unable to retrieve food logs.",
+      detail: error.message
+    });
+  }
+});
+
+/**
  * POST /parse-food
  * Request body: { "text": "200 gms rice" }
  */
@@ -163,11 +186,11 @@ router.post('/parse-food', validateParseRequest, async (req, res) => {
       validateGeminiResponse(normalizedInput, result);
       
       // Store response directly in DB
-      saveFoodLog(normalizedInput, result);
+      const savedLog = saveFoodLog(normalizedInput, result);
       
       return res.json({
         success: true,
-        data: result
+        data: savedLog
       });
     } catch (error) {
       console.warn(`[Validation/API Failure] Attempt ${attempts} failed: ${error.message}`);
@@ -184,6 +207,102 @@ router.post('/parse-food', validateParseRequest, async (req, res) => {
     message: "Unable to parse food log using the AI model at this moment.",
     detail: lastError?.message
   });
+});
+
+/**
+ * PUT /log/:id
+ * Request body: { "foodText": "150 grams rice" }
+ */
+router.put('/log/:id', async (req, res) => {
+  const { id } = req.params;
+  const { foodText } = req.body;
+
+  if (foodText === undefined || foodText === null) {
+    return res.status(400).json({
+      success: false,
+      error: "Bad Request",
+      message: "The request body must contain a 'foodText' field."
+    });
+  }
+
+  if (typeof foodText !== 'string' || foodText.trim() === '') {
+    return res.status(400).json({
+      success: false,
+      error: "Bad Request",
+      message: "The 'foodText' field must be a non-empty string."
+    });
+  }
+
+  const normalizedInput = normalizeFoodInput(foodText);
+  console.log(`[Edit Log] ID: ${id} | Raw: "${foodText}" | Normalized: "${normalizedInput}"`);
+
+  let attempts = 0;
+  const maxAttempts = 2;
+  let lastError = null;
+
+  // Retry System
+  while (attempts < maxAttempts) {
+    attempts++;
+    console.log(`[Gemini Request] Calling API on edit. Attempt ${attempts}/${maxAttempts} for text: "${normalizedInput}"`);
+    
+    try {
+      // Send normalized input to Gemini API
+      const result = await analyzeFood(normalizedInput);
+      
+      // Perform universal safety checks
+      validateGeminiResponse(normalizedInput, result);
+      
+      // Update SQLite database with new parsed data
+      const updatedLog = updateFoodLog(id, normalizedInput, result);
+      
+      return res.json({
+        success: true,
+        data: updatedLog
+      });
+    } catch (error) {
+      console.warn(`[Validation/API Failure on Edit] Attempt ${attempts} failed: ${error.message}`);
+      lastError = error;
+    }
+  }
+
+  // Both attempts failed
+  console.error(`[Error Log] All edit attempts failed for ID ${id}. Details: ${lastError.message}`);
+  
+  return res.status(502).json({
+    success: false,
+    error: lastError?.name || "Parser / Validation Error",
+    message: "Unable to parse food log using the AI model at this moment.",
+    detail: lastError?.message
+  });
+});
+
+/**
+ * DELETE /log/:id
+ * Removes log from database
+ */
+router.delete('/log/:id', (req, res) => {
+  const { id } = req.params;
+  try {
+    const success = deleteFoodLog(id);
+    if (!success) {
+      return res.status(404).json({
+        success: false,
+        error: "Not Found",
+        message: `Food log with ID ${id} not found.`
+      });
+    }
+    return res.json({
+      success: true
+    });
+  } catch (error) {
+    console.error(`[DELETE /log/${id} Error]:`, error);
+    return res.status(500).json({
+      success: false,
+      error: "Database Error",
+      message: "Unable to delete food log.",
+      detail: error.message
+    });
+  }
 });
 
 export default router;
