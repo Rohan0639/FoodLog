@@ -4,10 +4,24 @@ export interface FoodItem {
   quantity: number;
   unit: string;
   calories: number;
-  protein: number; // in grams
-  carbs: number;   // in grams
-  fat: number;     // in grams
-  loggedAt: Date;
+  protein: number;
+  carbs: number;
+  fats: number;
+  createdAt: string;
+}
+
+export interface FoodEntry {
+  id: string;
+  name: string;
+  quantity: number;
+  unit: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+  createdAt: string;
+  isOffline?: boolean;
+  isOfflineUpdated?: boolean;
 }
 
 export interface ParsedItem {
@@ -48,6 +62,7 @@ export interface OfflineAction {
   id?: string;
   tempId?: string;
   text?: string;
+  entry?: FoodEntry;
   timestamp: string;
 }
 

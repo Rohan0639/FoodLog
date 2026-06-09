@@ -84,7 +84,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
                   <div className="flex gap-3 text-[10px] text-zinc-450 pl-4 font-medium">
                     <span>Protein: <strong className="text-zinc-300 font-semibold">{food.protein}g</strong></span>
                     <span>Carbs: <strong className="text-zinc-300 font-semibold">{food.carbs}g</strong></span>
-                    <span>Fat: <strong className="text-zinc-300 font-semibold">{food.fat}g</strong></span>
+                    <span>Fat: <strong className="text-zinc-300 font-semibold">{food.fats}g</strong></span>
                   </div>
                 </div>
               ))}

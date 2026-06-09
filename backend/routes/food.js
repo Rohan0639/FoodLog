@@ -1,6 +1,24 @@
 import express from 'express';
 import { analyzeFood } from '../services/geminiService.js';
-import { saveFoodLog, getFoodLogs, updateFoodLog, deleteFoodLog } from '../services/dbService.js';
+import { saveFoodLog, getFoodLogs, updateFoodLog, deleteFoodLog, saveFoodEntry, getFoodEntries, updateFoodEntry, deleteFoodEntry, clearAllFoodEntries } from '../services/dbService.js';
+
+function parseQuantityAndUnit(quantityStr) {
+  if (typeof quantityStr === 'number') {
+    return { quantity: quantityStr, unit: 'piece' };
+  }
+  const str = String(quantityStr || '').trim();
+  const match = str.match(/^(\d+(?:\.\d+)?)\s*(.*)$/);
+  if (match) {
+    return {
+      quantity: parseFloat(match[1]),
+      unit: match[2] ? match[2].trim() : 'piece'
+    };
+  }
+  return {
+    quantity: parseFloat(str) || 1,
+    unit: str || 'piece'
+  };
+}
 
 const router = express.Router();
 
@@ -137,22 +155,44 @@ const validateParseRequest = (req, res, next) => {
 };
 
 /**
+ * GET /food
+ * Returns all saved food entries
+ */
+router.get('/food', (req, res) => {
+  try {
+    const entries = getFoodEntries();
+    return res.json({
+      success: true,
+      data: entries
+    });
+  } catch (error) {
+    console.error('[GET /food Error]:', error);
+    return res.status(500).json({
+      success: false,
+      error: "Database Error",
+      message: "Unable to retrieve food entries.",
+      detail: error.message
+    });
+  }
+});
+
+/**
  * GET /logs
- * Returns all saved food logs
+ * Returns all saved food entries (mapped for backward-compatibility)
  */
 router.get('/logs', (req, res) => {
   try {
-    const logs = getFoodLogs();
+    const entries = getFoodEntries();
     return res.json({
       success: true,
-      data: logs
+      data: entries
     });
   } catch (error) {
     console.error('[GET /logs Error]:', error);
     return res.status(500).json({
       success: false,
       error: "Database Error",
-      message: "Unable to retrieve food logs.",
+      message: "Unable to retrieve food entries.",
       detail: error.message
     });
   }
@@ -185,12 +225,37 @@ router.post('/parse-food', validateParseRequest, async (req, res) => {
       // Perform universal safety checks
       validateGeminiResponse(normalizedInput, result);
       
-      // Store response directly in DB
-      const savedLog = saveFoodLog(normalizedInput, result);
+      // Store individual items in food_entries table
+      const items = result.items || [];
+      const savedEntries = [];
+      
+      for (const item of items) {
+        const { quantity, unit } = parseQuantityAndUnit(item.quantity);
+        const entry = saveFoodEntry({
+          name: item.name || 'Unknown',
+          quantity,
+          unit,
+          calories: item.calories || 0,
+          protein: item.protein || 0,
+          carbs: item.carbs || 0,
+          fats: item.fat || 0
+        });
+        if (entry) {
+          savedEntries.push(entry);
+        }
+      }
+
+      // Also save fallback logs for safety
+      try {
+        saveFoodLog(normalizedInput, result);
+      } catch (err) {
+        console.warn('[Warning] Failed to write raw fallback food log:', err.message);
+      }
       
       return res.json({
         success: true,
-        data: savedLog
+        reply: result.reply || `Logged your food!`,
+        data: savedEntries
       });
     } catch (error) {
       console.warn(`[Validation/API Failure] Attempt ${attempts} failed: ${error.message}`);
@@ -210,85 +275,189 @@ router.post('/parse-food', validateParseRequest, async (req, res) => {
 });
 
 /**
+ * PUT /food/:id
+ * Request body: { name, quantity, unit, calories, protein, carbs, fats }
+ */
+router.put('/food/:id', (req, res) => {
+  const { id } = req.params;
+  const { name, quantity, unit, calories, protein, carbs, fats } = req.body;
+
+  if (!name || quantity === undefined || !unit || calories === undefined || protein === undefined || carbs === undefined || fats === undefined) {
+    return res.status(400).json({
+      success: false,
+      error: "Bad Request",
+      message: "All fields are required to update a food entry: name, quantity, unit, calories, protein, carbs, fats."
+    });
+  }
+
+  if (parseFloat(quantity) <= 0) {
+    return res.status(400).json({
+      success: false,
+      error: "Bad Request",
+      message: "Quantity must be greater than zero."
+    });
+  }
+
+  try {
+    const updated = updateFoodEntry(id, {
+      name,
+      quantity: parseFloat(quantity),
+      unit,
+      calories: parseFloat(calories),
+      protein: parseFloat(protein),
+      carbs: parseFloat(carbs),
+      fats: parseFloat(fats)
+    });
+    return res.json({
+      success: true,
+      data: updated
+    });
+  } catch (error) {
+    console.error(`[PUT /food/${id} Error]:`, error);
+    if (error.message.includes('not found')) {
+      return res.status(404).json({
+        success: false,
+        error: "Not Found",
+        message: error.message
+      });
+    }
+    return res.status(500).json({
+      success: false,
+      error: "Database Error",
+      message: "Unable to update food entry.",
+      detail: error.message
+    });
+  }
+});
+
+/**
  * PUT /log/:id
- * Request body: { "foodText": "150 grams rice" }
+ * Maps to /food/:id if request body has full info, otherwise falls back to NLP re-parse
  */
 router.put('/log/:id', async (req, res) => {
   const { id } = req.params;
-  const { foodText } = req.body;
+  const { name, quantity, unit, calories, protein, carbs, fats, foodText } = req.body;
 
+  // Direct edit of fields
+  if (name && quantity !== undefined && unit) {
+    try {
+      const updated = updateFoodEntry(id, {
+        name,
+        quantity: parseFloat(quantity),
+        unit,
+        calories: parseFloat(calories || 0),
+        protein: parseFloat(protein || 0),
+        carbs: parseFloat(carbs || 0),
+        fats: parseFloat(fats || 0)
+      });
+      return res.json({
+        success: true,
+        data: updated
+      });
+    } catch (err) {
+      console.warn(`[PUT /log/:id direct update failed]:`, err.message);
+    }
+  }
+
+  // Fallback to old re-parsing logic
   if (foodText === undefined || foodText === null) {
     return res.status(400).json({
       success: false,
       error: "Bad Request",
-      message: "The request body must contain a 'foodText' field."
-    });
-  }
-
-  if (typeof foodText !== 'string' || foodText.trim() === '') {
-    return res.status(400).json({
-      success: false,
-      error: "Bad Request",
-      message: "The 'foodText' field must be a non-empty string."
+      message: "The request body must contain a 'foodText' field or full food entry details."
     });
   }
 
   const normalizedInput = normalizeFoodInput(foodText);
-  console.log(`[Edit Log] ID: ${id} | Raw: "${foodText}" | Normalized: "${normalizedInput}"`);
-
   let attempts = 0;
   const maxAttempts = 2;
   let lastError = null;
 
-  // Retry System
   while (attempts < maxAttempts) {
     attempts++;
-    console.log(`[Gemini Request] Calling API on edit. Attempt ${attempts}/${maxAttempts} for text: "${normalizedInput}"`);
-    
     try {
-      // Send normalized input to Gemini API
       const result = await analyzeFood(normalizedInput);
-      
-      // Perform universal safety checks
       validateGeminiResponse(normalizedInput, result);
       
-      // Update SQLite database with new parsed data
-      const updatedLog = updateFoodLog(id, normalizedInput, result);
+      // Delete old food entry, create new ones
+      deleteFoodEntry(id);
       
+      const items = result.items || [];
+      const savedEntries = [];
+      for (const item of items) {
+        const { quantity: parsedQty, unit: parsedUnit } = parseQuantityAndUnit(item.quantity);
+        const entry = saveFoodEntry({
+          name: item.name || 'Unknown',
+          quantity: parsedQty,
+          unit: parsedUnit,
+          calories: item.calories || 0,
+          protein: item.protein || 0,
+          carbs: item.carbs || 0,
+          fats: item.fat || 0
+        });
+        if (entry) {
+          savedEntries.push(entry);
+        }
+      }
+
       return res.json({
         success: true,
-        data: updatedLog
+        data: savedEntries[0] || null
       });
     } catch (error) {
-      console.warn(`[Validation/API Failure on Edit] Attempt ${attempts} failed: ${error.message}`);
       lastError = error;
     }
   }
 
-  // Both attempts failed
-  console.error(`[Error Log] All edit attempts failed for ID ${id}. Details: ${lastError.message}`);
-  
   return res.status(502).json({
     success: false,
     error: lastError?.name || "Parser / Validation Error",
-    message: "Unable to parse food log using the AI model at this moment.",
+    message: "Unable to parse food log using the AI model.",
     detail: lastError?.message
   });
 });
 
 /**
- * DELETE /log/:id
- * Removes log from database
+ * DELETE /food/:id
  */
-router.delete('/log/:id', (req, res) => {
+router.delete('/food/:id', (req, res) => {
   const { id } = req.params;
   try {
-    const success = deleteFoodLog(id);
+    const success = deleteFoodEntry(id);
     if (!success) {
       return res.status(404).json({
         success: false,
         error: "Not Found",
-        message: `Food log with ID ${id} not found.`
+        message: `Food entry with ID ${id} not found.`
+      });
+    }
+    return res.json({
+      success: true
+    });
+  } catch (error) {
+    console.error(`[DELETE /food/${id} Error]:`, error);
+    return res.status(500).json({
+      success: false,
+      error: "Database Error",
+      message: "Unable to delete food entry.",
+      detail: error.message
+    });
+  }
+});
+
+/**
+ * DELETE /log/:id
+ * Maps to DELETE /food/:id
+ */
+router.delete('/log/:id', (req, res) => {
+  const { id } = req.params;
+  try {
+    const success = deleteFoodEntry(id) || deleteFoodLog(id);
+    if (!success) {
+      return res.status(404).json({
+        success: false,
+        error: "Not Found",
+        message: `Food entry or log with ID ${id} not found.`
       });
     }
     return res.json({
@@ -299,7 +468,7 @@ router.delete('/log/:id', (req, res) => {
     return res.status(500).json({
       success: false,
       error: "Database Error",
-      message: "Unable to delete food log.",
+      message: "Unable to delete food entry.",
       detail: error.message
     });
   }
