@@ -4,10 +4,28 @@ export interface FoodItem {
   quantity: number;
   unit: string;
   calories: number;
-  protein: number; // in grams
-  carbs: number;   // in grams
-  fat: number;     // in grams
-  loggedAt: Date;
+  protein: number;
+  carbs: number;
+  fats: number;
+  createdAt: string;
+  baseQuantity?: number;
+  baseUnit?: string;
+}
+
+export interface FoodEntry {
+  id: string;
+  name: string;
+  quantity: number;
+  unit: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+  createdAt: string;
+  isOffline?: boolean;
+  isOfflineUpdated?: boolean;
+  baseQuantity?: number;
+  baseUnit?: string;
 }
 
 export interface ParsedItem {
@@ -48,6 +66,7 @@ export interface OfflineAction {
   id?: string;
   tempId?: string;
   text?: string;
+  entry?: FoodEntry;
   timestamp: string;
 }
 
@@ -58,6 +77,9 @@ export interface Message {
   timestamp: Date;
   isTyping?: boolean;
   parsedFoods?: FoodItem[];
+  pendingFoods?: FoodEntry[];
+  isConfirmed?: boolean;
+  isDiscarded?: boolean;
 }
 
 export interface NutritionSummary {

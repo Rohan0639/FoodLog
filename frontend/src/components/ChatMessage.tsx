@@ -1,12 +1,25 @@
 import React from 'react';
-import type { Message, FoodItem } from '../types';
+import type { Message, FoodItem, FoodEntry } from '../types';
 import { Bot, User, Flame, ChevronRight, Apple } from 'lucide-react';
+import { ReviewConfirmTable } from './ReviewConfirmTable';
 
 interface ChatMessageProps {
   message: Message;
+  activeFoods?: FoodEntry[];
+  setActiveFoods?: React.Dispatch<React.SetStateAction<FoodEntry[]>>;
+  onConfirm?: () => void;
+  onDiscard?: () => void;
+  isActionDisabled?: boolean;
 }
 
-export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
+export const ChatMessage: React.FC<ChatMessageProps> = ({
+  message,
+  activeFoods,
+  setActiveFoods,
+  onConfirm,
+  onDiscard,
+  isActionDisabled = false,
+}) => {
   const isUser = message.sender === 'user';
   
   // Format timestamp (e.g. 15:08)
@@ -54,6 +67,17 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
           )}
         </div>
 
+        {/* Interactive Review & Confirm Table */}
+        {!message.isTyping && message.pendingFoods && activeFoods && setActiveFoods && onConfirm && onDiscard && (
+          <ReviewConfirmTable
+            foods={activeFoods}
+            setFoods={setActiveFoods}
+            onConfirm={onConfirm}
+            onDiscard={onDiscard}
+            disabled={isActionDisabled}
+          />
+        )}
+
         {/* Parsed Food Receipt (if any) */}
         {!message.isTyping && message.parsedFoods && message.parsedFoods.length > 0 && (
           <div className="w-full mt-2 rounded-xl bg-zinc-950 border border-zinc-850 p-3.5 space-y-3 shadow-inner animate-fade-in">
@@ -84,7 +108,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
                   <div className="flex gap-3 text-[10px] text-zinc-450 pl-4 font-medium">
                     <span>Protein: <strong className="text-zinc-300 font-semibold">{food.protein}g</strong></span>
                     <span>Carbs: <strong className="text-zinc-300 font-semibold">{food.carbs}g</strong></span>
-                    <span>Fat: <strong className="text-zinc-300 font-semibold">{food.fat}g</strong></span>
+                    <span>Fat: <strong className="text-zinc-300 font-semibold">{food.fats}g</strong></span>
                   </div>
                 </div>
               ))}
@@ -93,7 +117,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
         )}
 
         {/* Timestamp */}
-        <span className="text-[10px] text-zinc-500 mt-1 px-1 font-mono uppercase">
+        <span className="text-[10px] text-zinc-550 mt-1 px-1 font-mono uppercase">
           {formatTime(message.timestamp)}
         </span>
       </div>

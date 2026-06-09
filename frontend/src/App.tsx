@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import type { Message, FoodItem, DailyGoal, FoodLog, OfflineAction, ParsedItem } from './types';
-import { isGreeting } from './utils/parserMock';
+import type { Message, DailyGoal, OfflineAction, FoodEntry } from './types';
+import { convertUnit } from './utils/unitConverter';
 import { EmptyState } from './components/EmptyState';
 import { ChatMessage } from './components/ChatMessage';
 import { ChatInput } from './components/ChatInput';
@@ -26,10 +26,6 @@ const generateTempId = (): string => {
   return `temp-${crypto.randomUUID()}`;
 };
 
-const generateFoodItemId = (): string => {
-  return `food-${crypto.randomUUID()}`;
-};
-
 const getCurrentDate = (): Date => {
   return new Date();
 };
@@ -47,12 +43,15 @@ export default function App() {
       timestamp: new Date(),
     },
   ]);
-  const [logs, setLogs] = useState<FoodLog[]>([]);
+  const [logs, setLogs] = useState<FoodEntry[]>([]);
   const [dailyGoal] = useState<DailyGoal>(DEFAULT_DAILY_GOAL);
   const [isOnline, setIsOnline] = useState<boolean | null>(null); // null = checking
 
   const [isBotTyping, setIsBotTyping] = useState(false);
   const [isDashboardOpenMobile, setIsDashboardOpenMobile] = useState(false);
+
+  const [activeFoods, setActiveFoods] = useState<FoodEntry[]>([]);
+  const [activeReviewMessageId, setActiveReviewMessageId] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -110,7 +109,7 @@ export default function App() {
 
       setIsOnline(true);
       try {
-        const response = await fetch(`${API_URL}/logs`);
+        const response = await fetch(`${API_URL}/food`);
         if (!response.ok) throw new Error('Failed to fetch logs');
         const data = await response.json();
         if (data.success && Array.isArray(data.data)) {
@@ -162,10 +161,16 @@ export default function App() {
           });
           if (response.ok) {
             const data = await response.json();
-            if (data.success && data.data) {
-              setLogs((prev) =>
-                prev.map((log) => (log._id === action.tempId ? data.data : log))
-              );
+            if (data.success && Array.isArray(data.data)) {
+              setLogs((prev) => {
+                const idx = prev.findIndex((item) => item.id === action.tempId);
+                if (idx !== -1) {
+                  const updated = [...prev];
+                  updated.splice(idx, 1, ...data.data);
+                  return updated;
+                }
+                return [...data.data, ...prev];
+              });
             }
             remainingActions.shift();
           } else {
@@ -174,19 +179,13 @@ export default function App() {
             }
             break;
           }
-        } else if (action.type === 'EDIT') {
-          const response = await fetch(`${API_URL}/log/${action.id}`, {
+        } else if (action.type === 'EDIT' && action.entry) {
+          const response = await fetch(`${API_URL}/food/${action.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ foodText: action.text }),
+            body: JSON.stringify(action.entry),
           });
           if (response.ok) {
-            const data = await response.json();
-            if (data.success && data.data) {
-              setLogs((prev) =>
-                prev.map((log) => (log._id === action.id ? data.data : log))
-              );
-            }
             remainingActions.shift();
           } else {
             if (response.status === 400 || response.status === 502 || response.status === 404) {
@@ -195,7 +194,7 @@ export default function App() {
             break;
           }
         } else if (action.type === 'DELETE') {
-          const response = await fetch(`${API_URL}/log/${action.id}`, {
+          const response = await fetch(`${API_URL}/food/${action.id}`, {
             method: 'DELETE',
           });
           if (response.ok || response.status === 404) {
@@ -215,7 +214,7 @@ export default function App() {
     if (remainingActions.length === 0) {
       console.log('[Sync] All offline actions synced successfully.');
       try {
-        const response = await fetch(`${API_URL}/logs`);
+        const response = await fetch(`${API_URL}/food`);
         if (response.ok) {
           const data = await response.json();
           if (data.success && Array.isArray(data.data)) {
@@ -245,24 +244,6 @@ export default function App() {
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
-
-  const parseQuantity = (quantityStr: string | number) => {
-    if (typeof quantityStr === 'number') {
-      return { quantity: quantityStr, unit: 'serving' };
-    }
-    const str = String(quantityStr || '').trim();
-    const match = str.match(/^(\d+(?:\.\d+)?)\s*(.*)$/);
-    if (match) {
-      return {
-        quantity: parseFloat(match[1]),
-        unit: match[2] ? match[2].trim() : 'serving'
-      };
-    }
-    return {
-      quantity: parseFloat(str) || 1,
-      unit: str || 'serving'
-    };
-  };
 
   const handleSendMessage = async (text: string) => {
     // Intercept clear/reset commands
@@ -305,83 +286,44 @@ export default function App() {
         throw new Error(`Parser server returned status: ${response.status}`);
       }
 
-      const parseData = await response.json(); // Expected: { success: true, data: savedLog }
-      const newLog: FoodLog = parseData.data;
-      const analyzeData = newLog.parsedData || {};
-      const items = analyzeData.items || [];
-      const totals = analyzeData.totals || { calories: 0, protein: 0, carbs: 0, fat: 0 };
+      const parseData = await response.json(); // Expected: { success: true, reply: "...", data: [FoodEntry1, ...] }
+      const newEntries: FoodEntry[] = parseData.data || [];
+      const replyText = parseData.reply || `Please review the parsed food items:`;
 
-      let parsedItems: FoodItem[] = [];
-      let replyText = '';
-
-      if (items.length > 0) {
-        parsedItems = items.map((item: ParsedItem) => {
-          const { quantity, unit } = parseQuantity(item.quantity);
-          return {
-            id: generateFoodItemId(),
-            name: item.name,
-            quantity,
-            unit,
-            calories: Math.round(item.calories || 0),
-            protein: Math.round((item.protein || 0) * 10) / 10,
-            carbs: Math.round((item.carbs || 0) * 10) / 10,
-            fat: Math.round((item.fat || 0) * 10) / 10,
-            loggedAt: getCurrentDate()
-          };
-        });
-
-        setLogs((prev) => [newLog, ...prev]);
-        
-        // Confetti celebration
-        confetti({
-          particleCount: 80,
-          spread: 60,
-          origin: { y: 0.85 },
-          colors: ['#ffffff', '#e4e4e7', '#a1a1aa', '#52525b']
-        });
-
-        const totalCalories = totals.calories || 0;
-        const foodNames = parsedItems.map(f => `"${f.name}" (${f.calories} kcal)`).join(', and ');
-        replyText = analyzeData.reply || `Got it! I parsed and logged ${foodNames}. Added a total of **${totalCalories} calories** to your tracker.`;
-      } else {
-        if (analyzeData.reply) {
-          replyText = analyzeData.reply;
-        } else if (isGreeting(text)) {
-          replyText = `Hello! I'm ready to help you track your food. Just type what you ate, for example: "I had 2 eggs and a banana".`;
-        } else {
-          replyText = `I couldn't identify any food items in your message. Could you try describing it differently?`;
-        }
-      }
-
+      const botMsgId = generateMessageId('bot');
       const botMsg: Message = {
-        id: generateMessageId('bot'),
+        id: botMsgId,
         sender: 'bot',
         text: replyText,
         timestamp: getCurrentDate(),
-        parsedFoods: parsedItems,
+        pendingFoods: newEntries.length > 0 ? newEntries : undefined,
       };
 
       setMessages((prev) => [...prev, botMsg]);
+
+      if (newEntries.length > 0) {
+        setActiveReviewMessageId(botMsgId);
+        setActiveFoods(newEntries);
+      }
     } catch (error) {
       const err = error as Error;
       console.warn('Failed to communicate with parse-food backend. Saving raw input locally...', err);
       
       const tempId = generateTempId();
-      const offlineLog: FoodLog = {
-        _id: tempId,
-        userId: 'default-user',
-        foodText: text,
-        parsedData: {
-          reply: 'Offline. Log will be analyzed once backend is online.',
-          items: [],
-          totals: { calories: 0, protein: 0, carbs: 0, fat: 0 }
-        },
+      const offlineEntry: FoodEntry = {
+        id: tempId,
+        name: text,
+        quantity: 1,
+        unit: 'serving',
+        calories: 0,
+        protein: 0,
+        carbs: 0,
+        fats: 0,
         createdAt: getCurrentIsoString(),
-        updatedAt: getCurrentIsoString(),
         isOffline: true
       };
 
-      setLogs((prev) => [offlineLog, ...prev]);
+      setLogs((prev) => [offlineEntry, ...prev]);
 
       try {
         const existingActions: OfflineAction[] = JSON.parse(localStorage.getItem('offline_pending_actions') || '[]');
@@ -412,16 +354,124 @@ export default function App() {
     }
   };
 
+  const handleConfirmLog = async () => {
+    if (activeFoods.length === 0) return;
+    setIsBotTyping(true);
 
+    try {
+      // Finalize and scale macro calculations for each food item
+      const finalizedFoods = activeFoods.map((item) => {
+        const quantity = item.quantity;
+        let scaled = { calories: item.calories, protein: item.protein, carbs: item.carbs, fats: item.fats };
+        
+        if (quantity > 0 && !isNaN(quantity)) {
+          try {
+            const baseUnit = item.baseUnit || item.unit;
+            const baseQty = item.baseQuantity || item.quantity;
+            const scaledQuantity = convertUnit(quantity, item.unit, baseUnit, item.name);
+            const scale = scaledQuantity / baseQty;
 
-  const handleDeleteFoodLog = async (id: string) => {
+            scaled = {
+              calories: Math.max(0, Math.round(item.calories * scale)),
+              protein: Math.max(0, Math.round(item.protein * scale * 10) / 10),
+              carbs: Math.max(0, Math.round(item.carbs * scale * 10) / 10),
+              fats: Math.max(0, Math.round(item.fats * scale * 10) / 10),
+            };
+          } catch (err) {
+            console.error('Scale error:', err);
+          }
+        }
+
+        return {
+          id: item.id,
+          name: item.name,
+          quantity: item.quantity,
+          unit: item.unit,
+          calories: scaled.calories,
+          protein: scaled.protein,
+          carbs: scaled.carbs,
+          fats: scaled.fats,
+          createdAt: item.createdAt || new Date().toISOString()
+        };
+      });
+
+      // Send batch save to database
+      const response = await fetch(`${API_URL}/food/batch`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ foods: finalizedFoods }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server batch log returned status: ${response.status}`);
+      }
+
+      const responseData = await response.json();
+      const savedEntries: FoodEntry[] = responseData.data || finalizedFoods;
+
+      // Update logs
+      setLogs((prev) => [...savedEntries, ...prev]);
+
+      // Confetti celebration
+      confetti({
+        particleCount: 80,
+        spread: 60,
+        origin: { y: 0.85 },
+        colors: ['#ffffff', '#e4e4e7', '#a1a1aa', '#52525b']
+      });
+
+      // Update the active review message in the chat history
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === activeReviewMessageId
+            ? {
+                ...msg,
+                text: "Logged successfully! 🍳",
+                pendingFoods: undefined,
+                parsedFoods: savedEntries
+              }
+            : msg
+        )
+      );
+    } catch (err) {
+      console.error('Failed to confirm and log food:', err);
+    } finally {
+      // Clear state
+      setActiveReviewMessageId(null);
+      setActiveFoods([]);
+      setIsBotTyping(false);
+    }
+  };
+
+  const handleDiscard = () => {
+    if (activeReviewMessageId) {
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === activeReviewMessageId
+            ? {
+                ...msg,
+                text: "Discarded logging session. ❌",
+                pendingFoods: undefined,
+                parsedFoods: []
+              }
+            : msg
+        )
+      );
+    }
+    setActiveReviewMessageId(null);
+    setActiveFoods([]);
+  };
+
+  const handleDeleteFoodEntry = async (id: string) => {
     // Optimistic local state update
-    setLogs((prev) => prev.filter((log) => log._id !== id));
+    setLogs((prev) => prev.filter((item) => item.id !== id));
 
     if (id.startsWith('temp-')) {
       try {
         const existingActions: OfflineAction[] = JSON.parse(localStorage.getItem('offline_pending_actions') || '[]');
-        const updatedActions = existingActions.filter((act) => act.tempId !== id);
+        const updatedActions = existingActions.filter((act: any) => act.tempId !== id);
         localStorage.setItem('offline_pending_actions', JSON.stringify(updatedActions));
       } catch (e) {
         console.error('Failed to update offline actions queue', e);
@@ -445,7 +495,7 @@ export default function App() {
     }
 
     try {
-      const response = await fetch(`${API_URL}/log/${id}`, {
+      const response = await fetch(`${API_URL}/food/${id}`, {
         method: 'DELETE',
       });
       if (!response.ok) {
@@ -467,53 +517,44 @@ export default function App() {
     }
   };
 
-  const handleUpdateFoodLog = async (id: string, newFoodText: string) => {
-    if (!newFoodText.trim()) return { success: false, message: 'Food text cannot be empty.' };
+  const handleUpdateFoodEntry = async (updatedEntry: FoodEntry) => {
+    const id = updatedEntry.id;
+    
+    // Optimistic UI update
+    setLogs((prev) =>
+      prev.map((item) => (item.id === id ? updatedEntry : item))
+    );
 
     if (id.startsWith('temp-')) {
-      setLogs((prev) =>
-        prev.map((log) =>
-          log._id === id
-            ? { ...log, foodText: newFoodText, updatedAt: getCurrentIsoString() }
-            : log
-        )
-      );
       try {
         const existingActions: OfflineAction[] = JSON.parse(localStorage.getItem('offline_pending_actions') || '[]');
-        const updatedActions = existingActions.map((act) =>
-          act.tempId === id ? { ...act, text: newFoodText } : act
+        const updatedActions = existingActions.map((act: any) =>
+          act.tempId === id ? { ...act, text: updatedEntry.name } : act
         );
         localStorage.setItem('offline_pending_actions', JSON.stringify(updatedActions));
       } catch (e) {
         console.error('Failed to update pending actions queue', e);
       }
-      return { success: true };
+      return;
     }
 
     if (!navigator.onLine) {
       setLogs((prev) =>
-        prev.map((log) =>
-          log._id === id
-            ? {
-                ...log,
-                foodText: newFoodText,
-                isOfflineUpdated: true,
-                updatedAt: getCurrentIsoString(),
-              }
-            : log
+        prev.map((item) =>
+          item.id === id ? { ...updatedEntry, isOfflineUpdated: true } : item
         )
       );
 
       try {
         const existingActions: OfflineAction[] = JSON.parse(localStorage.getItem('offline_pending_actions') || '[]');
-        const existingEditIdx = existingActions.findIndex((act) => act.type === 'EDIT' && act.id === id);
+        const existingEditIdx = existingActions.findIndex((act: any) => act.type === 'EDIT' && act.id === id);
         if (existingEditIdx !== -1) {
-          existingActions[existingEditIdx].text = newFoodText;
+          existingActions[existingEditIdx].entry = updatedEntry;
         } else {
           existingActions.push({
             type: 'EDIT',
             id,
-            text: newFoodText,
+            entry: updatedEntry,
             timestamp: getCurrentIsoString()
           });
         }
@@ -521,56 +562,39 @@ export default function App() {
       } catch (e) {
         console.error('Failed to queue offline edit', e);
       }
-
-      return { success: true, message: 'Saved offline. Changes will sync when online.' };
+      return;
     }
 
     try {
-      const response = await fetch(`${API_URL}/log/${id}`, {
+      const response = await fetch(`${API_URL}/food/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ foodText: newFoodText }),
+        body: JSON.stringify(updatedEntry),
       });
 
-      const data = await response.json();
-      if (!response.ok || !data.success) {
-        return {
-          success: false,
-          message: data.message || 'Validation or parsing failed.'
-        };
+      if (!response.ok) {
+        throw new Error('Validation or parsing failed on update.');
       }
-
-      setLogs((prev) =>
-        prev.map((log) => (log._id === id ? data.data : log))
-      );
-      return { success: true };
     } catch (err) {
       console.warn('Update request failed, fallback to local offline edit...', err);
       setLogs((prev) =>
-        prev.map((log) =>
-          log._id === id
-            ? {
-                ...log,
-                foodText: newFoodText,
-                isOfflineUpdated: true,
-                updatedAt: getCurrentIsoString(),
-              }
-            : log
+        prev.map((item) =>
+          item.id === id ? { ...updatedEntry, isOfflineUpdated: true } : item
         )
       );
 
       try {
         const existingActions: OfflineAction[] = JSON.parse(localStorage.getItem('offline_pending_actions') || '[]');
-        const existingEditIdx = existingActions.findIndex((act) => act.type === 'EDIT' && act.id === id);
+        const existingEditIdx = existingActions.findIndex((act: any) => act.type === 'EDIT' && act.id === id);
         if (existingEditIdx !== -1) {
-          existingActions[existingEditIdx].text = newFoodText;
+          existingActions[existingEditIdx].entry = updatedEntry;
         } else {
           existingActions.push({
             type: 'EDIT',
             id,
-            text: newFoodText,
+            entry: updatedEntry,
             timestamp: getCurrentIsoString()
           });
         }
@@ -578,17 +602,15 @@ export default function App() {
       } catch (e) {
         console.error('Failed to queue offline edit after failure', e);
       }
-
-      return { success: true, message: 'Saved offline. Changes will sync when online.' };
     }
   };
 
   const handleClearAll = async () => {
     // Delete all logs sequentially
-    const currentLogs = [...logs];
+    const currentEntries = [...logs];
     setLogs([]);
-    for (const log of currentLogs) {
-      await handleDeleteFoodLog(log._id);
+    for (const entry of currentEntries) {
+      await handleDeleteFoodEntry(entry.id);
     }
     
     const resetMsg: Message = {
@@ -660,7 +682,15 @@ export default function App() {
           ) : (
             <div className="flex flex-col gap-1">
               {messages.map((message) => (
-                <ChatMessage key={message.id} message={message} />
+                <ChatMessage
+                  key={message.id}
+                  message={message}
+                  activeFoods={message.id === activeReviewMessageId ? activeFoods : undefined}
+                  setActiveFoods={message.id === activeReviewMessageId ? setActiveFoods : undefined}
+                  onConfirm={message.id === activeReviewMessageId ? handleConfirmLog : undefined}
+                  onDiscard={message.id === activeReviewMessageId ? handleDiscard : undefined}
+                  isActionDisabled={isBotTyping}
+                />
               ))}
               
               {/* Bot typing simulation */}
@@ -681,7 +711,7 @@ export default function App() {
         </div>
 
         {/* Bottom Input Area */}
-        <ChatInput onSendMessage={handleSendMessage} disabled={isBotTyping} />
+        <ChatInput onSendMessage={handleSendMessage} disabled={isBotTyping || !!activeReviewMessageId} />
       </div>
 
       {/* RIGHT AREA: Nutrition Dashboard (Desktop: sidebar, Mobile: toggle slide-over drawer) */}
@@ -691,8 +721,8 @@ export default function App() {
         <NutritionDashboard
           logs={logs}
           dailyGoal={dailyGoal}
-          onDeleteFoodLog={handleDeleteFoodLog}
-          onUpdateFoodLog={handleUpdateFoodLog}
+          onDeleteFoodLog={handleDeleteFoodEntry}
+          onUpdateFoodLog={handleUpdateFoodEntry}
           onClearAll={handleClearAll}
         />
       </div>
@@ -719,8 +749,8 @@ export default function App() {
               <NutritionDashboard
                 logs={logs}
                 dailyGoal={dailyGoal}
-                onDeleteFoodLog={handleDeleteFoodLog}
-                onUpdateFoodLog={handleUpdateFoodLog}
+                onDeleteFoodLog={handleDeleteFoodEntry}
+                onUpdateFoodLog={handleUpdateFoodEntry}
                 onClearAll={handleClearAll}
               />
             </div>
