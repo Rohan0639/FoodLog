@@ -1,7 +1,7 @@
 import express from 'express';
 import crypto from 'crypto';
 import { analyzeFood } from '../services/geminiService.js';
-import { saveFoodLog, getFoodLogs, updateFoodLog, deleteFoodLog, saveFoodEntry, getFoodEntries, updateFoodEntry, deleteFoodEntry, clearAllFoodEntries } from '../services/dbService.js';
+import { saveFoodLog, getFoodLogs, updateFoodLog, deleteFoodLog, saveFoodEntry, getFoodEntries, updateFoodEntry, deleteFoodEntry, clearAllFoodEntries, getFoodEntriesByDate, getLoggedDaysByMonth, getHistoryStats } from '../services/dbService.js';
 
 function parseQuantityAndUnit(quantityStr) {
   if (typeof quantityStr === 'number') {
@@ -517,6 +517,90 @@ router.post('/food/batch', (req, res) => {
       success: false,
       error: "Database Error",
       message: "Unable to save food entries.",
+      detail: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/logs?date=YYYY-MM-DD
+ * Returns all logs for a selected date
+ */
+router.get('/api/logs', (req, res) => {
+  const { date } = req.query;
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return res.status(400).json({
+      success: false,
+      error: "Bad Request",
+      message: "The 'date' query parameter is required and must be in YYYY-MM-DD format."
+    });
+  }
+
+  try {
+    const dailyLog = getFoodEntriesByDate(date);
+    return res.json({
+      success: true,
+      data: dailyLog
+    });
+  } catch (error) {
+    console.error(`[GET /api/logs Error]:`, error);
+    return res.status(500).json({
+      success: false,
+      error: "Database Error",
+      message: "Unable to retrieve food logs for the selected date.",
+      detail: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/logs/month?month=YYYY-MM
+ * Returns all days with logs for a specific month YYYY-MM
+ */
+router.get('/api/logs/month', (req, res) => {
+  const { month } = req.query;
+  if (!month || !/^\d{4}-\d{2}$/.test(month)) {
+    return res.status(400).json({
+      success: false,
+      error: "Bad Request",
+      message: "The 'month' query parameter is required and must be in YYYY-MM format."
+    });
+  }
+
+  try {
+    const loggedDays = getLoggedDaysByMonth(month);
+    return res.json({
+      success: true,
+      data: loggedDays
+    });
+  } catch (error) {
+    console.error(`[GET /api/logs/month Error]:`, error);
+    return res.status(500).json({
+      success: false,
+      error: "Database Error",
+      message: "Unable to retrieve logged days for the selected month.",
+      detail: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/logs/stats
+ * Returns calorie averages, consecutive day streaks, and last 7 days metrics
+ */
+router.get('/api/logs/stats', (req, res) => {
+  try {
+    const stats = getHistoryStats();
+    return res.json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    console.error(`[GET /api/logs/stats Error]:`, error);
+    return res.status(500).json({
+      success: false,
+      error: "Database Error",
+      message: "Unable to retrieve calorie/activity metrics.",
       detail: error.message
     });
   }

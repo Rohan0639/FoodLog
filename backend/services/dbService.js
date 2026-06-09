@@ -437,3 +437,161 @@ export function clearAllFoodEntries() {
     throw error;
   }
 }
+
+/**
+ * Retrieves all food entries logged on a specific date (YYYY-MM-DD)
+ * @param {string} dateString - Date in YYYY-MM-DD format
+ * @returns {object} Grouped daily log with total macro aggregates
+ */
+export function getFoodEntriesByDate(dateString) {
+  if (!db) {
+    console.warn('[Database] Database is not initialized.');
+    return null;
+  }
+
+  try {
+    const query = db.prepare(`
+      SELECT id, name, quantity, unit, calories, protein, carbs, fats, createdAt
+      FROM food_entries
+      WHERE strftime('%Y-%m-%d', createdAt) = ?
+      ORDER BY createdAt ASC
+    `);
+    const items = query.all(dateString);
+    
+    const totals = items.reduce((acc, item) => {
+      return {
+        calories: acc.calories + (item.calories || 0),
+        protein: acc.protein + (item.protein || 0),
+        carbs: acc.carbs + (item.carbs || 0),
+        fats: acc.fats + (item.fats || 0)
+      };
+    }, { calories: 0, protein: 0, carbs: 0, fats: 0 });
+
+    return {
+      date: dateString,
+      items,
+      totalCalories: Math.round(totals.calories),
+      totalProtein: Math.round(totals.protein * 10) / 10,
+      totalCarbs: Math.round(totals.carbs * 10) / 10,
+      totalFats: Math.round(totals.fats * 10) / 10
+    };
+  } catch (error) {
+    console.error(`[Database] Failed to query entries for date ${dateString}:`, error.message);
+    throw error;
+  }
+}
+
+/**
+ * Retrieves distinct days (YYYY-MM-DD) that have food logs inside a month (YYYY-MM)
+ * @param {string} monthString - Month in YYYY-MM format
+ * @returns {Array<string>} List of logged dates
+ */
+export function getLoggedDaysByMonth(monthString) {
+  if (!db) {
+    console.warn('[Database] Database is not initialized.');
+    return [];
+  }
+
+  try {
+    const query = db.prepare(`
+      SELECT DISTINCT strftime('%Y-%m-%d', createdAt) as logDate
+      FROM food_entries
+      WHERE strftime('%Y-%m', createdAt) = ?
+      ORDER BY logDate ASC
+    `);
+    const rows = query.all(monthString);
+    return rows.map(r => r.logDate);
+  } catch (error) {
+    console.error(`[Database] Failed to query logged days for month ${monthString}:`, error.message);
+    throw error;
+  }
+}
+
+/**
+ * Computes health and log history statistics (Streaks, Weekly Calorie Average, 7-Day Graph Data)
+ * @returns {object} History statistics object
+ */
+export function getHistoryStats() {
+  if (!db) {
+    console.warn('[Database] Database is not initialized.');
+    return {
+      streak: 0,
+      weeklyAverage: 0,
+      graphData: []
+    };
+  }
+
+  try {
+    // 1. Get last 7 days of daily calorie totals
+    const graphData = [];
+    let weeklyTotal = 0;
+
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+
+      const query = db.prepare(`
+        SELECT SUM(calories) as dailyCalories
+        FROM food_entries
+        WHERE strftime('%Y-%m-%d', createdAt) = ?
+      `);
+      const row = query.get(dateStr);
+      const calories = Math.round(row?.dailyCalories || 0);
+      graphData.push({
+        date: dateStr,
+        calories
+      });
+
+      weeklyTotal += calories;
+    }
+
+    const weeklyAverage = Math.round(weeklyTotal / 7);
+
+    // 2. Calculate streak (days logged consecutively starting from today or yesterday)
+    const allDatesQuery = db.prepare(`
+      SELECT DISTINCT strftime('%Y-%m-%d', createdAt) as logDate
+      FROM food_entries
+      ORDER BY logDate DESC
+    `);
+    const loggedDates = allDatesQuery.all().map(r => r.logDate);
+    
+    let streak = 0;
+    if (loggedDates.length > 0) {
+      const todayStr = new Date().toISOString().split('T')[0];
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+      let checkDate = null;
+      if (loggedDates.includes(todayStr)) {
+        checkDate = new Date();
+      } else if (loggedDates.includes(yesterdayStr)) {
+        checkDate = yesterday;
+      }
+
+      if (checkDate) {
+        let keepChecking = true;
+        while (keepChecking) {
+          const checkStr = checkDate.toISOString().split('T')[0];
+          if (loggedDates.includes(checkStr)) {
+            streak++;
+            checkDate.setDate(checkDate.getDate() - 1);
+          } else {
+            keepChecking = false;
+          }
+        }
+      }
+    }
+
+    return {
+      streak,
+      weeklyAverage,
+      graphData
+    };
+  } catch (error) {
+    console.error('[Database] Failed to compute history stats:', error.message);
+    throw error;
+  }
+}
+
