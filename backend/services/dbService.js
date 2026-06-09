@@ -8,10 +8,7 @@ const __dirname = path.dirname(__filename);
 
 let db = null;
 
-// Resolve database path — /tmp on ephemeral hosts, local otherwise
-const dbPath = process.env.VERCEL
-  ? '/tmp/foodlog.db'
-  : path.join(__dirname, '..', 'foodlog.db');
+const dbPath = path.join(__dirname, '..', 'foodlog.db');
 
 try {
   console.log(`[Database] Initializing SQLite database at: ${dbPath}`);
