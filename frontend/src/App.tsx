@@ -147,7 +147,7 @@ export default function App() {
 
   // Daily Reset at Midnight (12:00 AM local time)
   useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
+    let timeoutId: any;
 
     const setupMidnightTimer = () => {
       const now = new Date();
