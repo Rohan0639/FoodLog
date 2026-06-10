@@ -85,17 +85,17 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
       const endDate = `${nextYear}-${nextMonthStr}-01T00:00:00.000Z`;
 
       const { data, error } = await supabase
-        .from('food_entries')
-        .select('createdAt')
-        .gte('createdAt', startDate)
-        .lt('createdAt', endDate);
+        .from('food_logs')
+        .select('created_at')
+        .gte('created_at', startDate)
+        .lt('created_at', endDate);
 
       if (error) throw error;
 
       const dates = Array.from(
         new Set(
           (data || [])
-            .map((item) => item.createdAt ? item.createdAt.split('T')[0] : '')
+            .map((item: any) => item.created_at ? item.created_at.split('T')[0] : '')
             .filter(Boolean)
         )
       );
@@ -118,15 +118,26 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
     setIsHistoryLoading(true);
     try {
       const { data, error } = await supabase
-        .from('food_entries')
+        .from('food_logs')
         .select('*')
-        .gte('createdAt', `${date}T00:00:00.000Z`)
-        .lte('createdAt', `${date}T23:59:59.999Z`)
-        .order('createdAt', { ascending: false });
+        .gte('created_at', `${date}T00:00:00.000Z`)
+        .lte('created_at', `${date}T23:59:59.999Z`)
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      const items = data || [];
+      const items = (data || []).map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        quantity: item.quantity,
+        unit: item.unit,
+        calories: item.calories,
+        protein: item.protein,
+        carbs: item.carbs,
+        fats: item.fats,
+        createdAt: item.created_at
+      }));
+
       const totalCalories = items.reduce((acc, curr) => acc + (curr.calories || 0), 0);
       const totalProtein = Math.round(items.reduce((acc, curr) => acc + (curr.protein || 0), 0) * 10) / 10;
       const totalCarbs = Math.round(items.reduce((acc, curr) => acc + (curr.carbs || 0), 0) * 10) / 10;
@@ -168,15 +179,15 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
       const startDateStr = `${sixDaysAgo.toISOString().split('T')[0]}T00:00:00.000Z`;
 
       const { data: recentEntries, error: recentError } = await supabase
-        .from('food_entries')
-        .select('createdAt, calories')
-        .gte('createdAt', startDateStr);
+        .from('food_logs')
+        .select('created_at, calories')
+        .gte('created_at', startDateStr);
 
       if (recentError) throw recentError;
 
       const caloriesByDate: Record<string, number> = {};
-      (recentEntries || []).forEach((item) => {
-        const dateStr = item.createdAt ? item.createdAt.split('T')[0] : '';
+      (recentEntries || []).forEach((item: any) => {
+        const dateStr = item.created_at ? item.created_at.split('T')[0] : '';
         if (dateStr) {
           caloriesByDate[dateStr] = (caloriesByDate[dateStr] || 0) + (item.calories || 0);
         }
@@ -199,16 +210,16 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
 
       // 2. Fetch distinct logged dates to calculate streak
       const { data: allDatesData, error: allDatesError } = await supabase
-        .from('food_entries')
-        .select('createdAt')
-        .order('createdAt', { ascending: false });
+        .from('food_logs')
+        .select('created_at')
+        .order('created_at', { ascending: false });
 
       if (allDatesError) throw allDatesError;
 
       const loggedDates = Array.from(
         new Set(
           (allDatesData || [])
-            .map((item) => item.createdAt ? item.createdAt.split('T')[0] : '')
+            .map((item: any) => item.created_at ? item.created_at.split('T')[0] : '')
             .filter(Boolean)
         )
       );
@@ -278,7 +289,7 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
     // Delete past log
     try {
       const { error } = await supabase
-        .from('food_entries')
+        .from('food_logs')
         .delete()
         .eq('id', id);
 
