@@ -45,6 +45,7 @@ export default function App() {
   ]);
   const [logs, setLogs] = useState<FoodEntry[]>([]);
   const [dailyGoal] = useState<DailyGoal>(DEFAULT_DAILY_GOAL);
+  const [todayDateStr, setTodayDateStr] = useState<string>(new Date().toISOString().split('T')[0]);
   const [isOnline, setIsOnline] = useState<boolean | null>(null); // null = checking
 
   const [isBotTyping, setIsBotTyping] = useState(false);
@@ -99,7 +100,13 @@ export default function App() {
         const cached = localStorage.getItem('food_logs_local');
         if (cached) {
           try {
-            setLogs(JSON.parse(cached));
+            const allCached = JSON.parse(cached);
+            const todayStr = new Date().toISOString().split('T')[0];
+            const filtered = allCached.filter((log: FoodEntry) => {
+              const logDate = log.createdAt ? log.createdAt.split('T')[0] : '';
+              return logDate === todayStr;
+            });
+            setLogs(filtered);
           } catch (e) {
             console.error('Failed to parse cached logs', e);
           }
@@ -121,7 +128,13 @@ export default function App() {
         const cached = localStorage.getItem('food_logs_local');
         if (cached) {
           try {
-            setLogs(JSON.parse(cached));
+            const allCached = JSON.parse(cached);
+            const todayStr = new Date().toISOString().split('T')[0];
+            const filtered = allCached.filter((log: FoodEntry) => {
+              const logDate = log.createdAt ? log.createdAt.split('T')[0] : '';
+              return logDate === todayStr;
+            });
+            setLogs(filtered);
           } catch (e) {
             console.error('Failed to parse cached logs', e);
           }
@@ -131,6 +144,73 @@ export default function App() {
 
     checkHealthAndLoadLogs();
   }, []);
+
+  // Daily Reset at Midnight (12:00 AM local time)
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+
+    const setupMidnightTimer = () => {
+      const now = new Date();
+      const midnight = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate() + 1,
+        0, 0, 0, 0
+      );
+      const msToMidnight = midnight.getTime() - now.getTime();
+
+      console.log(`[Timer] Setup midnight reset in ${msToMidnight}ms (at ${midnight.toLocaleTimeString()})`);
+
+      timeoutId = setTimeout(() => {
+        handleMidnightReset();
+        // Setup next day's timer
+        setupMidnightTimer();
+      }, msToMidnight);
+    };
+
+    const handleMidnightReset = async () => {
+      console.log('[Timer] Midnight reached! Resetting logs for the new day.');
+
+      // Add a system bot message to notify the user
+      const resetMessage: Message = {
+        id: `bot-midnight-reset-${Date.now()}`,
+        sender: 'bot',
+        text: "Midnight reached! A new logging day has started. ☀️ Your previous logs are saved in history.",
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, resetMessage]);
+
+      const todayStr = new Date().toISOString().split('T')[0];
+      setTodayDateStr(todayStr);
+
+      if (isOnline) {
+        try {
+          const response = await fetch(`${API_URL}/food`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success && Array.isArray(data.data)) {
+              setLogs(data.data);
+              localStorage.setItem('food_logs_local', JSON.stringify(data.data));
+              return;
+            }
+          }
+        } catch (err) {
+          console.warn('[Timer] Failed to fetch new logs from server after midnight:', err);
+        }
+      }
+
+      // Offline fallback: clear logs since it's a new day
+      setLogs([]);
+    };
+
+    setupMidnightTimer();
+
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [isOnline]);
 
   // Synchronize offline actions when network is available
   const syncOfflineActions = async () => {
@@ -719,6 +799,7 @@ export default function App() {
       {/* Desktop Dashboard */}
       <div className="hidden lg:block w-[320px] xl:w-[350px] h-full shrink-0">
         <NutritionDashboard
+          key={todayDateStr}
           logs={logs}
           dailyGoal={dailyGoal}
           onDeleteFoodLog={handleDeleteFoodEntry}
@@ -747,6 +828,7 @@ export default function App() {
             </button>
             <div className="h-full pt-4">
               <NutritionDashboard
+                key={todayDateStr}
                 logs={logs}
                 dailyGoal={dailyGoal}
                 onDeleteFoodLog={handleDeleteFoodEntry}

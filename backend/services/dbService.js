@@ -329,12 +329,14 @@ export function getFoodEntries() {
   }
 
   try {
+    const date = new Date().toISOString().split("T")[0];
     const query = db.prepare(`
       SELECT id, name, quantity, unit, calories, protein, carbs, fats, createdAt
       FROM food_entries
+      WHERE strftime('%Y-%m-%d', createdAt) = ?
       ORDER BY createdAt DESC
     `);
-    return query.all();
+    return query.all(date);
   } catch (error) {
     console.error('[Database] Failed to query food entries from SQLite:', error.message);
     return [];
