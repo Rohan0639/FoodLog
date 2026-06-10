@@ -7,8 +7,8 @@ import { ChatInput } from './components/ChatInput';
 import { NutritionDashboard } from './components/NutritionDashboard';
 import { Apple, BarChart2, X } from 'lucide-react';
 import confetti from 'canvas-confetti';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+import { supabase } from './lib/supabase';
+import { analyzeFoodClient } from './utils/geminiParser';
 
 const DEFAULT_DAILY_GOAL: DailyGoal = {
   calories: 2000,
@@ -33,6 +33,10 @@ const getCurrentDate = (): Date => {
 const getCurrentIsoString = (): string => {
   return new Date().toISOString();
 };
+
+function getTodayDate(): string {
+  return new Date().toISOString().split("T")[0];
+}
 
 export default function App() {
   const [messages, setMessages] = useState<Message[]>([
@@ -65,71 +69,31 @@ export default function App() {
     scrollToBottom();
   }, [messages, isBotTyping]);
 
-  // Health check with up to 3 retries, then load logs
+  // Load logs from Supabase on start
   useEffect(() => {
-    const checkHealthAndLoadLogs = async () => {
-      const MAX_RETRIES = 3;
-      const RETRY_DELAY_MS = 1500;
+    const checkConnectionAndLoadLogs = async () => {
+      try {
+        const todayStr = getTodayDate();
+        const { data, error } = await supabase
+          .from('food_entries')
+          .select('*')
+          .gte('createdAt', `${todayStr}T00:00:00.000Z`)
+          .lte('createdAt', `${todayStr}T23:59:59.999Z`)
+          .order('createdAt', { ascending: false });
 
-      let attempt = 0;
-      let healthy = false;
+        if (error) throw error;
 
-      while (attempt < MAX_RETRIES && !healthy) {
-        try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 5000);
-          const res = await fetch(`${API_URL}/health`, { signal: controller.signal });
-          clearTimeout(timeoutId);
-          if (res.ok) {
-            healthy = true;
-          }
-        } catch {
-          attempt++;
-          if (attempt < MAX_RETRIES) {
-            console.warn(`[Health] Attempt ${attempt} failed. Retrying in ${RETRY_DELAY_MS}ms...`);
-            await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
-          }
-        }
-        if (healthy) break;
-        attempt++;
-      }
-
-      if (!healthy) {
-        console.warn('[Health] Backend unreachable after 3 attempts. Switching to offline mode.');
+        setIsOnline(true);
+        setLogs(data || []);
+        localStorage.setItem('food_logs_local', JSON.stringify(data || []));
+      } catch (err) {
+        console.warn('Unable to fetch logs from Supabase. Falling back to local cache.', err);
         setIsOnline(false);
         const cached = localStorage.getItem('food_logs_local');
         if (cached) {
           try {
             const allCached = JSON.parse(cached);
-            const todayStr = new Date().toISOString().split('T')[0];
-            const filtered = allCached.filter((log: FoodEntry) => {
-              const logDate = log.createdAt ? log.createdAt.split('T')[0] : '';
-              return logDate === todayStr;
-            });
-            setLogs(filtered);
-          } catch (e) {
-            console.error('Failed to parse cached logs', e);
-          }
-        }
-        return;
-      }
-
-      setIsOnline(true);
-      try {
-        const response = await fetch(`${API_URL}/food`);
-        if (!response.ok) throw new Error('Failed to fetch logs');
-        const data = await response.json();
-        if (data.success && Array.isArray(data.data)) {
-          setLogs(data.data);
-          localStorage.setItem('food_logs_local', JSON.stringify(data.data));
-        }
-      } catch (err) {
-        console.warn('Unable to fetch logs from server. Falling back to local cache.', err);
-        const cached = localStorage.getItem('food_logs_local');
-        if (cached) {
-          try {
-            const allCached = JSON.parse(cached);
-            const todayStr = new Date().toISOString().split('T')[0];
+            const todayStr = getTodayDate();
             const filtered = allCached.filter((log: FoodEntry) => {
               const logDate = log.createdAt ? log.createdAt.split('T')[0] : '';
               return logDate === todayStr;
@@ -142,12 +106,12 @@ export default function App() {
       }
     };
 
-    checkHealthAndLoadLogs();
+    checkConnectionAndLoadLogs();
   }, []);
 
   // Daily Reset at Midnight (12:00 AM local time)
   useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
+    let timeoutId: any;
 
     const setupMidnightTimer = () => {
       const now = new Date();
@@ -180,22 +144,25 @@ export default function App() {
       };
       setMessages((prev) => [...prev, resetMessage]);
 
-      const todayStr = new Date().toISOString().split('T')[0];
+      const todayStr = getTodayDate();
       setTodayDateStr(todayStr);
 
       if (isOnline) {
         try {
-          const response = await fetch(`${API_URL}/food`);
-          if (response.ok) {
-            const data = await response.json();
-            if (data.success && Array.isArray(data.data)) {
-              setLogs(data.data);
-              localStorage.setItem('food_logs_local', JSON.stringify(data.data));
-              return;
-            }
+          const { data, error } = await supabase
+            .from('food_entries')
+            .select('*')
+            .gte('createdAt', `${todayStr}T00:00:00.000Z`)
+            .lte('createdAt', `${todayStr}T23:59:59.999Z`)
+            .order('createdAt', { ascending: false });
+
+          if (!error && data) {
+            setLogs(data);
+            localStorage.setItem('food_logs_local', JSON.stringify(data));
+            return;
           }
         } catch (err) {
-          console.warn('[Timer] Failed to fetch new logs from server after midnight:', err);
+          console.warn('[Timer] Failed to fetch new logs from Supabase after midnight:', err);
         }
       }
 
@@ -234,50 +201,68 @@ export default function App() {
     for (const action of actions) {
       try {
         if (action.type === 'ADD') {
-          const response = await fetch(`${API_URL}/parse-food`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: action.text }),
+          // Analyze food text client-side via Gemini API
+          const parseData = await analyzeFoodClient(action.text!);
+          const items = parseData.items || [];
+          const entriesToSave = items.map((item) => {
+            const rawQty = parseFloat(item.quantity) || 1;
+            const rawUnit = item.quantity.replace(/^\d+(?:\.\d+)?\s*/, '') || 'piece';
+            return {
+              id: crypto.randomUUID(),
+              name: item.name || 'Unknown',
+              quantity: rawQty,
+              unit: rawUnit,
+              baseQuantity: rawQty,
+              baseUnit: rawUnit,
+              calories: item.calories || 0,
+              protein: item.protein || 0,
+              carbs: item.carbs || 0,
+              fats: item.fat || 0,
+              createdAt: action.timestamp || new Date().toISOString()
+            };
           });
-          if (response.ok) {
-            const data = await response.json();
-            if (data.success && Array.isArray(data.data)) {
-              setLogs((prev) => {
-                const idx = prev.findIndex((item) => item.id === action.tempId);
-                if (idx !== -1) {
-                  const updated = [...prev];
-                  updated.splice(idx, 1, ...data.data);
-                  return updated;
-                }
-                return [...data.data, ...prev];
-              });
-            }
+
+          const { error } = await supabase.from('food_entries').insert(entriesToSave);
+          if (!error) {
+            setLogs((prev) => {
+              const idx = prev.findIndex((item) => item.id === action.tempId);
+              if (idx !== -1) {
+                const updated = [...prev];
+                updated.splice(idx, 1, ...entriesToSave);
+                return updated;
+              }
+              return [...entriesToSave, ...prev];
+            });
             remainingActions.shift();
           } else {
-            if (response.status === 400 || response.status === 502) {
-              remainingActions.shift();
-            }
             break;
           }
         } else if (action.type === 'EDIT' && action.entry) {
-          const response = await fetch(`${API_URL}/food/${action.id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(action.entry),
-          });
-          if (response.ok) {
+          const { error } = await supabase
+            .from('food_entries')
+            .update({
+              name: action.entry.name,
+              quantity: action.entry.quantity,
+              unit: action.entry.unit,
+              calories: action.entry.calories,
+              protein: action.entry.protein,
+              carbs: action.entry.carbs,
+              fats: action.entry.fats
+            })
+            .eq('id', action.id);
+
+          if (!error) {
             remainingActions.shift();
           } else {
-            if (response.status === 400 || response.status === 502 || response.status === 404) {
-              remainingActions.shift();
-            }
             break;
           }
         } else if (action.type === 'DELETE') {
-          const response = await fetch(`${API_URL}/food/${action.id}`, {
-            method: 'DELETE',
-          });
-          if (response.ok || response.status === 404) {
+          const { error } = await supabase
+            .from('food_entries')
+            .delete()
+            .eq('id', action.id);
+
+          if (!error) {
             remainingActions.shift();
           } else {
             break;
@@ -294,13 +279,17 @@ export default function App() {
     if (remainingActions.length === 0) {
       console.log('[Sync] All offline actions synced successfully.');
       try {
-        const response = await fetch(`${API_URL}/food`);
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && Array.isArray(data.data)) {
-            setLogs(data.data);
-            localStorage.setItem('food_logs_local', JSON.stringify(data.data));
-          }
+        const todayStr = getTodayDate();
+        const { data, error } = await supabase
+          .from('food_entries')
+          .select('*')
+          .gte('createdAt', `${todayStr}T00:00:00.000Z`)
+          .lte('createdAt', `${todayStr}T23:59:59.999Z`)
+          .order('createdAt', { ascending: false });
+
+        if (!error && data) {
+          setLogs(data);
+          localStorage.setItem('food_logs_local', JSON.stringify(data));
         }
       } catch (err) {
         console.error('Failed to refresh logs after sync', err);
@@ -353,21 +342,26 @@ export default function App() {
     setIsBotTyping(true);
 
     try {
-      // 1. Call local Express backend POST /parse-food
-      const response = await fetch(`${API_URL}/parse-food`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ text }),
+      // 1. Call client-side Gemini food analysis
+      const parseData = await analyzeFoodClient(text);
+      const items = parseData.items || [];
+      const newEntries: FoodEntry[] = items.map((item) => {
+        const rawQty = parseFloat(item.quantity) || 1;
+        const rawUnit = item.quantity.replace(/^\d+(?:\.\d+)?\s*/, '') || 'piece';
+        return {
+          id: crypto.randomUUID(),
+          name: item.name || 'Unknown',
+          quantity: rawQty,
+          unit: rawUnit,
+          baseQuantity: rawQty,
+          baseUnit: rawUnit,
+          calories: item.calories || 0,
+          protein: item.protein || 0,
+          carbs: item.carbs || 0,
+          fats: item.fat || 0,
+          createdAt: new Date().toISOString()
+        };
       });
-
-      if (!response.ok) {
-        throw new Error(`Parser server returned status: ${response.status}`);
-      }
-
-      const parseData = await response.json(); // Expected: { success: true, reply: "...", data: [FoodEntry1, ...] }
-      const newEntries: FoodEntry[] = parseData.data || [];
       const replyText = parseData.reply || `Please review the parsed food items:`;
 
       const botMsgId = generateMessageId('bot');
@@ -475,24 +469,20 @@ export default function App() {
         };
       });
 
-      // Send batch save to database
-      const response = await fetch(`${API_URL}/food/batch`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ foods: finalizedFoods }),
-      });
+      // Send batch save to database (Supabase)
+      const { data: savedEntries, error } = await supabase
+        .from('food_entries')
+        .insert(finalizedFoods)
+        .select();
 
-      if (!response.ok) {
-        throw new Error(`Server batch log returned status: ${response.status}`);
+      if (error) {
+        throw new Error(`Supabase batch save error: ${error.message}`);
       }
 
-      const responseData = await response.json();
-      const savedEntries: FoodEntry[] = responseData.data || finalizedFoods;
+      const confirmedEntries = savedEntries || finalizedFoods;
 
       // Update logs
-      setLogs((prev) => [...savedEntries, ...prev]);
+      setLogs((prev) => [...confirmedEntries, ...prev]);
 
       // Confetti celebration
       confetti({
@@ -575,12 +565,11 @@ export default function App() {
     }
 
     try {
-      const response = await fetch(`${API_URL}/food/${id}`, {
-        method: 'DELETE',
-      });
-      if (!response.ok) {
-        throw new Error('Failed to delete log from server');
-      }
+      const { error } = await supabase
+        .from('food_entries')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
     } catch (error) {
       console.warn('Delete request failed, queuing offline delete action...', error);
       try {
@@ -646,16 +635,21 @@ export default function App() {
     }
 
     try {
-      const response = await fetch(`${API_URL}/food/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updatedEntry),
-      });
+      const { error } = await supabase
+        .from('food_entries')
+        .update({
+          name: updatedEntry.name,
+          quantity: updatedEntry.quantity,
+          unit: updatedEntry.unit,
+          calories: updatedEntry.calories,
+          protein: updatedEntry.protein,
+          carbs: updatedEntry.carbs,
+          fats: updatedEntry.fats
+        })
+        .eq('id', id);
 
-      if (!response.ok) {
-        throw new Error('Validation or parsing failed on update.');
+      if (error) {
+        throw error;
       }
     } catch (err) {
       console.warn('Update request failed, fallback to local offline edit...', err);
@@ -686,12 +680,24 @@ export default function App() {
   };
 
   const handleClearAll = async () => {
-    // Delete all logs sequentially
-    const currentEntries = [...logs];
+    const todayStr = getTodayDate();
     setLogs([]);
-    for (const entry of currentEntries) {
-      await handleDeleteFoodEntry(entry.id);
+
+    if (isOnline) {
+      try {
+        const { error } = await supabase
+          .from('food_entries')
+          .delete()
+          .gte('createdAt', `${todayStr}T00:00:00.000Z`)
+          .lte('createdAt', `${todayStr}T23:59:59.999Z`);
+        
+        if (error) throw error;
+      } catch (err) {
+        console.error('Failed to clear daily entries from Supabase:', err);
+      }
     }
+
+    localStorage.setItem('food_logs_local', JSON.stringify([]));
     
     const resetMsg: Message = {
       id: `bot-reset-${Date.now()}`,
