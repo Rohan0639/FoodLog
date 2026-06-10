@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { FoodEntry, DailyGoal } from '../types';
 import { EditFoodModal } from './EditFoodModal';
 import { CalendarView } from './CalendarView';
@@ -58,22 +58,8 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
 
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
 
-  // Simple key-value cache ref to avoid redundant network requests
-  const cacheRef = useRef<Record<string, any>>({});
-
-  // Clear cache on local mutation
-  useEffect(() => {
-    cacheRef.current = {};
-  }, [logs]);
-
   // Fetch logged days in a month YYYY-MM
   const fetchMonthLogs = async (month: string) => {
-    const cacheKey = `month-${month}`;
-    if (cacheRef.current[cacheKey]) {
-      setLoggedDays(cacheRef.current[cacheKey]);
-      return;
-    }
-
     try {
       const year = parseInt(month.split('-')[0]);
       const monthNum = parseInt(month.split('-')[1]);
@@ -101,7 +87,6 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
       );
 
       setLoggedDays(dates);
-      cacheRef.current[cacheKey] = dates;
     } catch (err) {
       console.error('Failed to fetch month logs:', err);
     }
@@ -109,12 +94,6 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
 
   // Fetch individual day food entries YYYY-MM-DD
   const fetchDateLogs = async (date: string) => {
-    const cacheKey = `logs-${date}`;
-    if (cacheRef.current[cacheKey]) {
-      setSelectedDateLog(cacheRef.current[cacheKey]);
-      return;
-    }
-
     setIsHistoryLoading(true);
     try {
       const { data, error } = await supabase
@@ -153,7 +132,6 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
       };
 
       setSelectedDateLog(result);
-      cacheRef.current[cacheKey] = result;
     } catch (err) {
       console.error('Failed to fetch date logs:', err);
     } finally {
@@ -163,12 +141,6 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
 
   // Fetch streak & graph stats
   const fetchStats = async () => {
-    const cacheKey = 'stats';
-    if (cacheRef.current[cacheKey]) {
-      setStats(cacheRef.current[cacheKey]);
-      return;
-    }
-
     try {
       // 1. Get last 7 days of daily calorie totals
       const graphData = [];
@@ -259,7 +231,6 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
       };
 
       setStats(statsData);
-      cacheRef.current[cacheKey] = statsData;
     } catch (err) {
       console.error('Failed to fetch stats:', err);
     }
@@ -295,8 +266,6 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
 
       if (error) throw error;
 
-      // Invalidate cache and refetch
-      cacheRef.current = {};
       fetchDateLogs(selectedDate);
       fetchMonthLogs(currentMonth);
       fetchStats();
