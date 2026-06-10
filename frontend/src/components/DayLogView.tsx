@@ -60,7 +60,7 @@ export const DayLogView: React.FC<DayLogViewProps> = ({
       ) : (
         <div className="space-y-4">
           {/* Daily macro totals summary card */}
-          <div className="p-4 bg-zinc-950 border border-zinc-900 rounded-2xl space-y-2.5 shadow-inner">
+          <div className="p-3 sm:p-4 bg-zinc-950 border border-zinc-900 rounded-2xl space-y-2.5 shadow-inner">
             <div className="flex justify-between items-baseline">
               <span className="text-[10px] font-black text-zinc-550 uppercase tracking-wider font-mono">
                 Total Intake Summary
@@ -84,7 +84,7 @@ export const DayLogView: React.FC<DayLogViewProps> = ({
               return (
                 <div
                   key={item.id}
-                  className="flex flex-col p-3 rounded-xl border border-zinc-900 bg-zinc-950/40 hover:bg-zinc-950/80 hover:border-zinc-800 transition-all duration-150 gap-2 relative overflow-hidden group"
+                  className="flex flex-col p-2.5 sm:p-3 rounded-xl border border-zinc-900 bg-zinc-950/40 hover:bg-zinc-950/80 hover:border-zinc-800 transition-all duration-150 gap-2 relative overflow-hidden group"
                 >
                   {isDeleteConfirming ? (
                     <div className="flex flex-col gap-2 p-1 text-center justify-center items-center w-full animate-fade-in">
@@ -131,7 +131,7 @@ export const DayLogView: React.FC<DayLogViewProps> = ({
 
                         <button
                           onClick={() => setDeleteConfirmId(item.id)}
-                          className="p-1.5 text-zinc-600 hover:text-red-400 hover:bg-zinc-900 rounded-lg transition-colors duration-150 opacity-0 group-hover:opacity-100"
+                          className="p-1.5 text-zinc-600 hover:text-red-400 hover:bg-zinc-900 rounded-lg transition-colors duration-150 lg:opacity-0 lg:group-hover:opacity-100 touch-manipulation"
                           title="Delete entry"
                         >
                           <Trash2 className="w-3.5 h-3.5" />

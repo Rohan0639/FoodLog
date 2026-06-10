@@ -33,42 +33,43 @@ export const HistoryStatsView: React.FC<HistoryStatsViewProps> = ({
   return (
     <div className="w-full space-y-4 font-sans text-white">
       {/* Metrics Row */}
-      <div className="grid grid-cols-2 gap-3.5">
+      {/* Metrics Row */}
+      <div className="grid grid-cols-2 gap-2 sm:gap-3.5">
         {/* Streak card */}
-        <div className="p-4 bg-zinc-950 border border-zinc-900 rounded-2xl flex items-center gap-3 shadow-inner">
-          <div className="w-10 h-10 rounded-xl bg-orange-500/10 text-orange-400 border border-orange-500/20 flex items-center justify-center shrink-0">
-            <Zap className="w-5.5 h-5.5 fill-orange-400/20" />
+        <div className="p-3 sm:p-4 bg-zinc-950 border border-zinc-900 rounded-2xl flex items-center gap-2 sm:gap-3 shadow-inner">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-orange-500/10 text-orange-400 border border-orange-500/20 flex items-center justify-center shrink-0">
+            <Zap className="w-5 h-5 sm:w-5.5 sm:h-5.5 fill-orange-400/20" />
           </div>
-          <div>
-            <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider font-mono">
+          <div className="min-w-0">
+            <div className="text-[9px] sm:text-[10px] font-bold text-zinc-500 uppercase tracking-wider font-mono truncate">
               Streak
             </div>
-            <div className="flex items-baseline gap-1 mt-0.5">
-              <span className="text-xl font-bold font-mono text-white">{streak}</span>
-              <span className="text-xs text-zinc-400 font-medium">days</span>
+            <div className="flex items-baseline gap-1 mt-0.5 flex-wrap">
+              <span className="text-lg sm:text-xl font-bold font-mono text-white leading-tight">{streak}</span>
+              <span className="text-[10px] sm:text-xs text-zinc-400 font-medium">days</span>
             </div>
           </div>
         </div>
 
         {/* Weekly average card */}
-        <div className="p-4 bg-zinc-950 border border-zinc-900 rounded-2xl flex items-center gap-3 shadow-inner">
-          <div className="w-10 h-10 rounded-xl bg-[#FF7E67]/10 text-[#FF7E67] border border-[#FF7E67]/20 flex items-center justify-center shrink-0">
-            <Flame className="w-5.5 h-5.5 fill-[#FF7E67]/20" />
+        <div className="p-3 sm:p-4 bg-zinc-950 border border-zinc-900 rounded-2xl flex items-center gap-2 sm:gap-3 shadow-inner">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#FF7E67]/10 text-[#FF7E67] border border-[#FF7E67]/20 flex items-center justify-center shrink-0">
+            <Flame className="w-5 h-5 sm:w-5.5 sm:h-5.5 fill-[#FF7E67]/20" />
           </div>
-          <div>
-            <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider font-mono">
+          <div className="min-w-0">
+            <div className="text-[9px] sm:text-[10px] font-bold text-zinc-500 uppercase tracking-wider font-mono truncate">
               Avg Calories
             </div>
-            <div className="flex items-baseline gap-1 mt-0.5">
-              <span className="text-xl font-bold font-mono text-white">{weeklyAverage}</span>
-              <span className="text-[10px] text-zinc-400 font-medium font-mono uppercase">kcal/d</span>
+            <div className="flex items-baseline gap-0.5 sm:gap-1 mt-0.5 flex-wrap">
+              <span className="text-lg sm:text-xl font-bold font-mono text-white leading-tight">{weeklyAverage}</span>
+              <span className="text-[9px] sm:text-[10px] text-zinc-400 font-medium font-mono uppercase">kcal/d</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* SVG Calorie Graph Card */}
-      <div className="p-4 bg-zinc-950 border border-zinc-900 rounded-2xl space-y-3.5 shadow-inner">
+      <div className="p-3 sm:p-4 bg-zinc-950 border border-zinc-900 rounded-2xl space-y-3.5 shadow-inner">
         <div className="flex justify-between items-center px-1">
           <span className="text-[10px] font-black text-zinc-550 uppercase tracking-wider font-mono">
             Calorie Intake (Last 7 Days)

@@ -281,7 +281,7 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
   return (
     <div className="w-full h-full flex flex-col bg-black text-white border-l border-zinc-900 overflow-hidden font-sans">
       {/* Tab Header */}
-      <div className="p-4 border-b border-zinc-900 flex justify-between items-center bg-black/85 top-0 backdrop-blur-md z-10 sticky">
+      <div className="p-3 sm:p-4 border-b border-zinc-900 flex justify-between items-center bg-black/85 top-0 backdrop-blur-md z-10 sticky">
         <div className="flex items-center gap-2">
           <div className="p-1.5 rounded-lg bg-zinc-900 text-white border border-zinc-850">
             <BarChart2 className="w-4.5 h-4.5" />
@@ -317,7 +317,7 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
       </div>
 
       {/* Tab Switch Selector Control */}
-      <div className="px-4 py-2 border-b border-zinc-900 flex gap-2 bg-black/50 shrink-0">
+      <div className="px-3 sm:px-4 py-2 border-b border-zinc-900 flex gap-2 bg-black/50 shrink-0">
         <button
           onClick={() => setActiveTab('today')}
           className={`flex-1 py-1.5 rounded-xl text-xs font-bold transition-all duration-150 ${
@@ -341,12 +341,12 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
       </div>
 
       {/* View Content based on Tab */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-5">
+      <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-4 sm:space-y-5">
         {activeTab === 'today' ? (
           /* ---------------- TODAY VIEW ---------------- */
           <>
             {/* Calorie Stats Card */}
-            <div className="p-4 rounded-2xl bg-zinc-950 border border-zinc-850 shadow-sm relative overflow-hidden">
+            <div className="p-3 sm:p-4 rounded-2xl bg-zinc-950 border border-zinc-850 shadow-sm relative overflow-hidden">
               <div className="flex justify-between items-baseline mb-2">
                 <span className="text-xs font-bold text-zinc-400 flex items-center gap-1.5 uppercase tracking-wide">
                   <Flame className="w-4 h-4 text-white" />
@@ -377,7 +377,7 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
                 Macronutrients
               </span>
               
-              <div className="space-y-3.5 bg-zinc-950 border border-zinc-850 rounded-2xl p-4">
+              <div className="space-y-3.5 bg-zinc-950 border border-zinc-850 rounded-2xl p-3 sm:p-4">
                 {/* Protein */}
                 <div>
                   <div className="flex justify-between text-xs mb-1.5">
@@ -489,7 +489,7 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
                           <div className="flex items-start justify-between">
                             <div className="min-w-0 pr-2">
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                <p className="text-xs font-bold text-zinc-200 truncate capitalize max-w-[150px]" title={item.name}>
+                                <p className="text-xs font-bold text-zinc-200 truncate capitalize max-w-[110px] min-[370px]:max-w-[150px] md:max-w-[180px]" title={item.name}>
                                   {item.name}
                                 </p>
                                 {item.isOffline && (

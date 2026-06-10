@@ -50,10 +50,10 @@ export default function Signup({ onShowLogin }: SignupProps) {
       <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-zinc-900/20 rounded-full blur-[120px] pointer-events-none" />
       <div className="absolute bottom-0 left-1/4 w-[500px] h-[500px] bg-zinc-900/10 rounded-full blur-[120px] pointer-events-none" />
 
-      <div className="w-full max-w-md bg-zinc-950/80 border border-zinc-900 rounded-2xl p-8 backdrop-blur-md shadow-2xl relative z-10">
+      <div className="w-full max-w-md bg-zinc-950/80 border border-zinc-900 rounded-2xl p-6 min-[370px]:p-8 backdrop-blur-md shadow-2xl relative z-10">
         
         {/* Brand Header */}
-        <div className="flex flex-col items-center mb-8">
+        <div className="flex flex-col items-center mb-6 sm:mb-8">
           <div className="w-12 h-12 rounded-xl bg-white flex items-center justify-center text-black mb-3 shadow">
             <Apple className="w-7 h-7 fill-black/10" />
           </div>
@@ -62,7 +62,7 @@ export default function Signup({ onShowLogin }: SignupProps) {
         </div>
 
         {error && (
-          <div className="mb-6 p-4 rounded-xl bg-red-950/30 border border-red-900/50 flex items-start gap-3 animate-fade-in">
+          <div className="mb-5 sm:mb-6 p-4 rounded-xl bg-red-950/30 border border-red-900/50 flex items-start gap-3 animate-fade-in">
             <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
             <span className="text-xs text-red-200 leading-relaxed">{error}</span>
           </div>
@@ -87,7 +87,7 @@ export default function Signup({ onShowLogin }: SignupProps) {
             </button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
             <div className="space-y-1.5">
               <label className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider block">Email Address</label>
               <input
@@ -142,7 +142,7 @@ export default function Signup({ onShowLogin }: SignupProps) {
         )}
 
         {!success && (
-          <div className="mt-8 pt-6 border-t border-zinc-900 text-center">
+          <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-zinc-900 text-center">
             <p className="text-zinc-500 text-xs">
               Already have an account?{' '}
               <button

@@ -18,8 +18,8 @@ export default function Navbar({
   hasLogs,
 }: NavbarProps) {
   return (
-    <header className="h-16 border-b border-zinc-900 px-6 flex items-center justify-between bg-black/90 backdrop-blur-md shrink-0 z-20">
-      <div className="flex items-center gap-3">
+    <header className="h-16 border-b border-zinc-900 px-3 min-[370px]:px-4 sm:px-6 flex items-center justify-between bg-black/90 backdrop-blur-md shrink-0 z-20">
+      <div className="flex items-center gap-2 sm:gap-3">
         <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-black shadow">
           <Apple className="w-5 h-5 fill-black/10" />
         </div>
@@ -46,7 +46,7 @@ export default function Navbar({
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2.5 sm:gap-4">
         {userEmail && (
           <span className="hidden sm:inline-block text-xs text-zinc-400 font-medium">
             {userEmail}
@@ -68,7 +68,7 @@ export default function Navbar({
           className="lg:hidden p-2 rounded-xl border border-zinc-850 bg-zinc-900/80 text-zinc-350 hover:text-white flex items-center gap-1.5 shadow-sm active:scale-95 transition-all duration-150"
         >
           <BarChart2 className="w-4.5 h-4.5 text-white" />
-          <span className="text-xs font-bold">Stats</span>
+          <span className="text-xs font-bold hidden min-[370px]:inline">Stats</span>
           {hasLogs && (
             <span className="w-2 h-2 rounded-full bg-white shrink-0" />
           )}

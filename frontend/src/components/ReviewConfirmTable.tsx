@@ -83,7 +83,7 @@ export const ReviewConfirmTable: React.FC<ReviewConfirmTableProps> = ({
   );
 
   return (
-    <div className="w-full mt-2 rounded-2xl bg-zinc-950 border border-zinc-850 p-4 space-y-4 shadow-xl animate-fade-in text-white font-sans max-w-lg">
+    <div className="w-full mt-2 rounded-2xl bg-zinc-950 border border-zinc-850 p-2.5 sm:p-4 space-y-3 sm:space-y-4 shadow-xl animate-fade-in text-white font-sans max-w-lg">
       {/* Title Header */}
       <div className="pb-2.5 border-b border-zinc-900 flex flex-col gap-1">
         <span className="text-xs font-black tracking-widest text-[#FF7E67] uppercase font-sans">
@@ -99,9 +99,9 @@ export const ReviewConfirmTable: React.FC<ReviewConfirmTableProps> = ({
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-zinc-900 text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+              <tr className="border-b border-zinc-900 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-zinc-500">
                 <th className="pb-2 font-semibold">Food Item</th>
-                <th className="pb-2 font-semibold pl-4">Qty</th>
+                <th className="pb-2 font-semibold pl-2 sm:pl-4">Qty</th>
                 <th className="pb-2 text-right font-semibold">Nutrition Info</th>
                 <th className="pb-2 text-right w-8"></th>
               </tr>
@@ -112,13 +112,13 @@ export const ReviewConfirmTable: React.FC<ReviewConfirmTableProps> = ({
                 return (
                   <tr key={food.id} className="hover:bg-zinc-900/20 transition-colors">
                     {/* Food Name */}
-                    <td className="py-3 pr-2 font-medium capitalize max-w-[120px] truncate" title={food.name}>
+                    <td className="py-2.5 sm:py-3 pr-1 sm:pr-2 font-medium capitalize max-w-[90px] min-[370px]:max-w-[120px] truncate" title={food.name}>
                       {food.name}
                     </td>
 
                     {/* Qty Editable Input + Unit Selector */}
-                    <td className="py-3 pl-4">
-                      <div className="flex items-center gap-1.5">
+                    <td className="py-2.5 sm:py-3 pl-2 sm:pl-4">
+                      <div className="flex items-center gap-1 sm:gap-1.5">
                         <input
                           type="number"
                           step="any"
@@ -126,14 +126,14 @@ export const ReviewConfirmTable: React.FC<ReviewConfirmTableProps> = ({
                           disabled={disabled}
                           value={food.quantity === 0 ? '' : food.quantity}
                           onChange={(e) => handleQtyChange(food.id, e.target.value)}
-                          className="w-14 px-1.5 py-1 text-center bg-zinc-900/60 border border-zinc-800 rounded-lg text-white font-mono focus:outline-none focus:border-zinc-500 disabled:opacity-55 disabled:cursor-not-allowed text-xs"
+                          className="w-11 min-[370px]:w-14 px-1 sm:px-1.5 py-1 text-center bg-zinc-900/60 border border-zinc-800 rounded-lg text-white font-mono focus:outline-none focus:border-zinc-500 disabled:opacity-55 disabled:cursor-not-allowed text-[11px] sm:text-xs"
                           placeholder="0"
                         />
                         <select
                           value={food.unit}
                           disabled={disabled}
                           onChange={(e) => handleUnitChange(food.id, e.target.value)}
-                          className="px-1.5 py-1 bg-zinc-900/60 border border-zinc-800 rounded-lg text-white focus:outline-none focus:border-zinc-500 disabled:opacity-55 disabled:cursor-not-allowed text-xs cursor-pointer select-arrow pr-4"
+                          className="px-1 sm:px-1.5 py-1 bg-zinc-900/60 border border-zinc-800 rounded-lg text-white focus:outline-none focus:border-zinc-500 disabled:opacity-55 disabled:cursor-not-allowed text-[11px] sm:text-xs cursor-pointer select-arrow pr-3 min-[370px]:pr-4"
                         >
                           <option value="g">g</option>
                           <option value="ml">ml</option>
@@ -144,20 +144,20 @@ export const ReviewConfirmTable: React.FC<ReviewConfirmTableProps> = ({
                     </td>
 
                     {/* Dynamic Nutrition calculations */}
-                    <td className="py-3 text-right font-mono">
-                      <div className="text-white font-bold text-xs">{scaled.calories} kcal</div>
-                      <div className="text-[9px] text-zinc-400 mt-0.5">
+                    <td className="py-2.5 sm:py-3 text-right font-mono">
+                      <div className="text-white font-bold text-[11px] sm:text-xs">{scaled.calories} kcal</div>
+                      <div className="text-[8px] sm:text-[9px] text-zinc-400 mt-0.5">
                         P:{scaled.protein}g | C:{scaled.carbs}g | F:{scaled.fats}g
                       </div>
                     </td>
 
                     {/* Row Delete Button */}
-                    <td className="py-3 text-right pl-2">
+                    <td className="py-2.5 sm:py-3 text-right pl-1.5 sm:pl-2">
                       <button
                         type="button"
                         disabled={disabled}
                         onClick={() => handleDeleteRow(food.id)}
-                        className="text-zinc-500 hover:text-red-400 hover:bg-zinc-900/50 p-1 rounded-md transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="text-zinc-500 hover:text-red-400 hover:bg-zinc-900/50 p-1 rounded-md transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation"
                         title="Delete item"
                       >
                         <X className="w-4 h-4" />
@@ -187,12 +187,12 @@ export const ReviewConfirmTable: React.FC<ReviewConfirmTableProps> = ({
       )}
 
       {/* Confirm & Discard CTA Buttons */}
-      <div className="flex gap-3 pt-1 text-[11px] font-bold">
+      <div className="flex gap-2 sm:gap-3 pt-1 text-[10px] sm:text-[11px] font-bold">
         <button
           type="button"
           disabled={disabled || foods.length === 0}
           onClick={onConfirm}
-          className="flex-1 px-4 py-2.5 rounded-xl bg-[#FF7E67] hover:bg-[#ff6950] text-white flex items-center justify-center gap-1.5 shadow-md active:scale-98 transition-all disabled:opacity-45 disabled:cursor-not-allowed"
+          className="flex-1 px-2.5 py-2.5 rounded-xl bg-[#FF7E67] hover:bg-[#ff6950] text-white flex items-center justify-center gap-1 sm:gap-1.5 shadow-md active:scale-98 transition-all disabled:opacity-45 disabled:cursor-not-allowed touch-manipulation"
         >
           <Check className="w-4 h-4 shrink-0" />
           <span>CONFIRM & LOG</span>
@@ -201,7 +201,7 @@ export const ReviewConfirmTable: React.FC<ReviewConfirmTableProps> = ({
           type="button"
           disabled={disabled}
           onClick={onDiscard}
-          className="flex-1 px-4 py-2.5 rounded-xl border border-zinc-800 hover:border-zinc-700 bg-transparent text-white flex items-center justify-center gap-1.5 active:scale-98 transition-all disabled:opacity-45 disabled:cursor-not-allowed"
+          className="flex-1 px-2.5 py-2.5 rounded-xl border border-zinc-850 hover:border-zinc-700 bg-transparent text-white flex items-center justify-center gap-1 sm:gap-1.5 active:scale-98 transition-all disabled:opacity-45 disabled:cursor-not-allowed touch-manipulation"
         >
           <X className="w-4 h-4 shrink-0" />
           <span>DISCARD</span>

@@ -87,7 +87,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   }
 
   return (
-    <div className="w-full bg-zinc-950 border border-zinc-900 rounded-2xl p-4 space-y-4 shadow-sm text-white select-none">
+    <div className="w-full bg-zinc-950 border border-zinc-900 rounded-2xl p-3 sm:p-4 space-y-4 shadow-sm text-white select-none">
       {/* Calendar Header: Month/Year navigation */}
       <div className="flex justify-between items-center px-1">
         <h4 className="text-sm font-bold tracking-tight text-white font-sans">
@@ -128,7 +128,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             <div
               key={cell.dateStr}
               onClick={() => onSelectDate(cell.dateStr!)}
-              className={`relative py-1.5 rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all duration-150 group font-mono font-medium ${
+              className={`relative py-1 sm:py-1.5 rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all duration-150 group font-mono font-medium touch-manipulation ${
                 cell.isSelected
                   ? 'bg-[#FF7E67] text-white font-bold shadow-md scale-105 z-10'
                   : cell.isToday

@@ -45,7 +45,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
       </div>
 
       {/* Message Bubble Container */}
-      <div className={`flex flex-col max-w-[85%] sm:max-w-[75%] gap-1 ${isUser ? 'items-end' : 'items-start'}`}>
+      <div className={`flex flex-col max-w-[92%] sm:max-w-[80%] md:max-w-[75%] gap-1 ${isUser ? 'items-end' : 'items-start'}`}>
         
         {/* Actual Message Bubble */}
         <div
@@ -80,7 +80,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
 
         {/* Parsed Food Receipt (if any) */}
         {!message.isTyping && message.parsedFoods && message.parsedFoods.length > 0 && (
-          <div className="w-full mt-2 rounded-xl bg-zinc-950 border border-zinc-850 p-3.5 space-y-3 shadow-inner animate-fade-in">
+          <div className="w-full mt-2 rounded-xl bg-zinc-950 border border-zinc-850 p-2.5 sm:p-3.5 space-y-3 shadow-inner animate-fade-in">
             {/* Header info */}
             <div className="flex items-center justify-between pb-2 border-b border-zinc-850">
               <span className="text-xs font-bold text-zinc-300 tracking-wide uppercase flex items-center gap-1.5">
