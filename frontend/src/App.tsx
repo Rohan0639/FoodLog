@@ -34,8 +34,31 @@ const getCurrentIsoString = (): string => {
   return new Date().toISOString();
 };
 
+const getLocalIsoDate = (d: Date = new Date()): string => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const parseLocalDateString = (timestamp: string): string => {
+  if (!timestamp || typeof timestamp !== 'string') {
+    return getLocalIsoDate();
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(timestamp)) {
+    return timestamp;
+  }
+  try {
+    const d = new Date(timestamp);
+    if (!isNaN(d.getTime())) {
+      return getLocalIsoDate(d);
+    }
+  } catch (e) {}
+  return timestamp.split('T')[0] || getLocalIsoDate();
+};
+
 function getTodayDate(): string {
-  return new Date().toISOString().split("T")[0];
+  return getLocalIsoDate();
 }
 
 export default function App() {
@@ -49,7 +72,7 @@ export default function App() {
   ]);
   const [logs, setLogs] = useState<FoodEntry[]>([]);
   const [dailyGoal] = useState<DailyGoal>(DEFAULT_DAILY_GOAL);
-  const [todayDateStr, setTodayDateStr] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [todayDateStr, setTodayDateStr] = useState<string>(getTodayDate());
   const [isOnline, setIsOnline] = useState<boolean | null>(null); // null = checking
 
   const [isBotTyping, setIsBotTyping] = useState(false);
@@ -77,8 +100,7 @@ export default function App() {
         const { data, error } = await supabase
           .from('food_logs')
           .select('*')
-          .gte('created_at', `${todayStr}T00:00:00.000Z`)
-          .lte('created_at', `${todayStr}T23:59:59.999Z`)
+          .eq('date', todayStr)
           .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -107,7 +129,7 @@ export default function App() {
             const allCached = JSON.parse(cached);
             const todayStr = getTodayDate();
             const filtered = allCached.filter((log: FoodEntry) => {
-              const logDate = log.createdAt ? log.createdAt.split('T')[0] : '';
+              const logDate = log.createdAt ? parseLocalDateString(log.createdAt) : '';
               return logDate === todayStr;
             });
             setLogs(filtered);
@@ -164,8 +186,7 @@ export default function App() {
           const { data, error } = await supabase
             .from('food_logs')
             .select('*')
-            .gte('created_at', `${todayStr}T00:00:00.000Z`)
-            .lte('created_at', `${todayStr}T23:59:59.999Z`)
+            .eq('date', todayStr)
             .order('created_at', { ascending: false });
 
           if (!error && data) {
@@ -241,7 +262,7 @@ export default function App() {
               carbs: item.carbs || 0,
               fats: item.fat || 0,
               created_at: timestamp,
-              date: timestamp.split('T')[0]
+              date: parseLocalDateString(timestamp)
             };
           });
 
@@ -317,8 +338,7 @@ export default function App() {
         const { data, error } = await supabase
           .from('food_logs')
           .select('*')
-          .gte('created_at', `${todayStr}T00:00:00.000Z`)
-          .lte('created_at', `${todayStr}T23:59:59.999Z`)
+          .eq('date', todayStr)
           .order('created_at', { ascending: false });
 
         if (!error && data) {
@@ -524,8 +544,10 @@ export default function App() {
         carbs: item.carbs,
         fats: item.fats,
         created_at: item.createdAt,
-        date: item.createdAt.split('T')[0]
+        date: parseLocalDateString(item.createdAt)
       }));
+
+      console.log('Sending dbFoods to Supabase:', dbFoods);
 
       // Send batch save to database (Supabase)
       const { data: savedEntries, error } = await supabase
@@ -758,8 +780,7 @@ export default function App() {
         const { error } = await supabase
           .from('food_logs')
           .delete()
-          .gte('created_at', `${todayStr}T00:00:00.000Z`)
-          .lte('created_at', `${todayStr}T23:59:59.999Z`);
+          .eq('date', todayStr);
         
         if (error) throw error;
       } catch (err) {
