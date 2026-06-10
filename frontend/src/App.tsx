@@ -230,6 +230,7 @@ export default function App() {
           const entriesToSave = items.map((item) => {
             const rawQty = parseFloat(item.quantity) || 1;
             const rawUnit = item.quantity.replace(/^\d+(?:\.\d+)?\s*/, '') || 'piece';
+            const timestamp = action.timestamp || new Date().toISOString();
             return {
               id: crypto.randomUUID(),
               name: item.name || 'Unknown',
@@ -239,7 +240,8 @@ export default function App() {
               protein: item.protein || 0,
               carbs: item.carbs || 0,
               fats: item.fat || 0,
-              created_at: action.timestamp || new Date().toISOString()
+              created_at: timestamp,
+              date: timestamp.split('T')[0]
             };
           });
 
@@ -521,7 +523,8 @@ export default function App() {
         protein: item.protein,
         carbs: item.carbs,
         fats: item.fats,
-        created_at: item.createdAt
+        created_at: item.createdAt,
+        date: item.createdAt.split('T')[0]
       }));
 
       // Send batch save to database (Supabase)
