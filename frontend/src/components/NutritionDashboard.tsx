@@ -1,5 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { FoodEntry, DailyGoal } from '../types';
+
+const getLocalIsoDate = (d: Date = new Date()): string => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 import { EditFoodModal } from './EditFoodModal';
 import { CalendarView } from './CalendarView';
 import { HistoryStatsView } from './HistoryStatsView';
@@ -38,7 +45,7 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
   const fatPercent = Math.min(Math.round((totalFat / dailyGoal.fat) * 105) / 105, 1);
 
   // History State
-  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState<string>(getLocalIsoDate());
   const [currentMonth, setCurrentMonth] = useState<string>(new Date().toISOString().slice(0, 7));
   const [loggedDays, setLoggedDays] = useState<string[]>([]);
   const [selectedDateLog, setSelectedDateLog] = useState<{
@@ -58,50 +65,35 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
 
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
 
-  // Simple key-value cache ref to avoid redundant network requests
-  const cacheRef = useRef<Record<string, any>>({});
-
-  // Clear cache on local mutation
-  useEffect(() => {
-    cacheRef.current = {};
-  }, [logs]);
-
   // Fetch logged days in a month YYYY-MM
   const fetchMonthLogs = async (month: string) => {
-    const cacheKey = `month-${month}`;
-    if (cacheRef.current[cacheKey]) {
-      setLoggedDays(cacheRef.current[cacheKey]);
-      return;
-    }
-
     try {
       const year = parseInt(month.split('-')[0]);
       const monthNum = parseInt(month.split('-')[1]);
       
-      const startDate = `${month}-01T00:00:00.000Z`;
+      const startDate = `${month}-01`;
       const nextMonth = monthNum === 12 ? 1 : monthNum + 1;
       const nextYear = monthNum === 12 ? year + 1 : year;
       const nextMonthStr = nextMonth < 10 ? `0${nextMonth}` : `${nextMonth}`;
-      const endDate = `${nextYear}-${nextMonthStr}-01T00:00:00.000Z`;
+      const endDate = `${nextYear}-${nextMonthStr}-01`;
 
       const { data, error } = await supabase
-        .from('food_entries')
-        .select('createdAt')
-        .gte('createdAt', startDate)
-        .lt('createdAt', endDate);
+        .from('food_logs')
+        .select('date')
+        .gte('date', startDate)
+        .lt('date', endDate);
 
       if (error) throw error;
 
       const dates = Array.from(
         new Set(
           (data || [])
-            .map((item) => item.createdAt ? item.createdAt.split('T')[0] : '')
+            .map((item: any) => item.date)
             .filter(Boolean)
         )
       );
 
       setLoggedDays(dates);
-      cacheRef.current[cacheKey] = dates;
     } catch (err) {
       console.error('Failed to fetch month logs:', err);
     }
@@ -109,24 +101,28 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
 
   // Fetch individual day food entries YYYY-MM-DD
   const fetchDateLogs = async (date: string) => {
-    const cacheKey = `logs-${date}`;
-    if (cacheRef.current[cacheKey]) {
-      setSelectedDateLog(cacheRef.current[cacheKey]);
-      return;
-    }
-
     setIsHistoryLoading(true);
     try {
       const { data, error } = await supabase
-        .from('food_entries')
+        .from('food_logs')
         .select('*')
-        .gte('createdAt', `${date}T00:00:00.000Z`)
-        .lte('createdAt', `${date}T23:59:59.999Z`)
-        .order('createdAt', { ascending: false });
+        .eq('date', date)
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      const items = data || [];
+      const items = (data || []).map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        quantity: item.quantity,
+        unit: item.unit,
+        calories: item.calories,
+        protein: item.protein,
+        carbs: item.carbs,
+        fats: item.fats,
+        createdAt: item.created_at
+      }));
+
       const totalCalories = items.reduce((acc, curr) => acc + (curr.calories || 0), 0);
       const totalProtein = Math.round(items.reduce((acc, curr) => acc + (curr.protein || 0), 0) * 10) / 10;
       const totalCarbs = Math.round(items.reduce((acc, curr) => acc + (curr.carbs || 0), 0) * 10) / 10;
@@ -142,7 +138,6 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
       };
 
       setSelectedDateLog(result);
-      cacheRef.current[cacheKey] = result;
     } catch (err) {
       console.error('Failed to fetch date logs:', err);
     } finally {
@@ -152,42 +147,34 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
 
   // Fetch streak & graph stats
   const fetchStats = async () => {
-    const cacheKey = 'stats';
-    if (cacheRef.current[cacheKey]) {
-      setStats(cacheRef.current[cacheKey]);
-      return;
-    }
-
     try {
       // 1. Get last 7 days of daily calorie totals
       const graphData = [];
       let weeklyTotal = 0;
 
-      const sixDaysAgo = new Date();
-      sixDaysAgo.setDate(sixDaysAgo.getDate() - 6);
-      const startDateStr = `${sixDaysAgo.toISOString().split('T')[0]}T00:00:00.000Z`;
+      const datesList = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        datesList.push(getLocalIsoDate(d));
+      }
 
       const { data: recentEntries, error: recentError } = await supabase
-        .from('food_entries')
-        .select('createdAt, calories')
-        .gte('createdAt', startDateStr);
+        .from('food_logs')
+        .select('date, calories')
+        .in('date', datesList);
 
       if (recentError) throw recentError;
 
       const caloriesByDate: Record<string, number> = {};
-      (recentEntries || []).forEach((item) => {
-        const dateStr = item.createdAt ? item.createdAt.split('T')[0] : '';
-        if (dateStr) {
-          caloriesByDate[dateStr] = (caloriesByDate[dateStr] || 0) + (item.calories || 0);
+      (recentEntries || []).forEach((item: any) => {
+        if (item.date) {
+          caloriesByDate[item.date] = (caloriesByDate[item.date] || 0) + (item.calories || 0);
         }
       });
 
-      for (let i = 6; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        const dateStr = d.toISOString().split('T')[0];
+      for (const dateStr of datesList) {
         const calories = Math.round(caloriesByDate[dateStr] || 0);
-        
         graphData.push({
           date: dateStr,
           calories
@@ -199,26 +186,26 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
 
       // 2. Fetch distinct logged dates to calculate streak
       const { data: allDatesData, error: allDatesError } = await supabase
-        .from('food_entries')
-        .select('createdAt')
-        .order('createdAt', { ascending: false });
+        .from('food_logs')
+        .select('date')
+        .order('date', { ascending: false });
 
       if (allDatesError) throw allDatesError;
 
       const loggedDates = Array.from(
         new Set(
           (allDatesData || [])
-            .map((item) => item.createdAt ? item.createdAt.split('T')[0] : '')
+            .map((item: any) => item.date)
             .filter(Boolean)
         )
       );
 
       let streak = 0;
       if (loggedDates.length > 0) {
-        const todayStr = new Date().toISOString().split('T')[0];
+        const todayStr = getLocalIsoDate();
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
-        const yesterdayStr = yesterday.toISOString().split('T')[0];
+        const yesterdayStr = getLocalIsoDate(yesterday);
 
         let checkDate: Date | null = null;
         if (loggedDates.includes(todayStr)) {
@@ -230,7 +217,7 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
         if (checkDate) {
           let keepChecking = true;
           while (keepChecking) {
-            const checkStr = checkDate.toISOString().split('T')[0];
+            const checkStr = getLocalIsoDate(checkDate);
             if (loggedDates.includes(checkStr)) {
               streak++;
               checkDate.setDate(checkDate.getDate() - 1);
@@ -248,7 +235,6 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
       };
 
       setStats(statsData);
-      cacheRef.current[cacheKey] = statsData;
     } catch (err) {
       console.error('Failed to fetch stats:', err);
     }
@@ -278,14 +264,12 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
     // Delete past log
     try {
       const { error } = await supabase
-        .from('food_entries')
+        .from('food_logs')
         .delete()
         .eq('id', id);
 
       if (error) throw error;
 
-      // Invalidate cache and refetch
-      cacheRef.current = {};
       fetchDateLogs(selectedDate);
       fetchMonthLogs(currentMonth);
       fetchStats();

@@ -34,8 +34,31 @@ const getCurrentIsoString = (): string => {
   return new Date().toISOString();
 };
 
+const getLocalIsoDate = (d: Date = new Date()): string => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const parseLocalDateString = (timestamp: string): string => {
+  if (!timestamp || typeof timestamp !== 'string') {
+    return getLocalIsoDate();
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(timestamp)) {
+    return timestamp;
+  }
+  try {
+    const d = new Date(timestamp);
+    if (!isNaN(d.getTime())) {
+      return getLocalIsoDate(d);
+    }
+  } catch (e) {}
+  return timestamp.split('T')[0] || getLocalIsoDate();
+};
+
 function getTodayDate(): string {
-  return new Date().toISOString().split("T")[0];
+  return getLocalIsoDate();
 }
 
 export default function App() {
@@ -49,7 +72,7 @@ export default function App() {
   ]);
   const [logs, setLogs] = useState<FoodEntry[]>([]);
   const [dailyGoal] = useState<DailyGoal>(DEFAULT_DAILY_GOAL);
-  const [todayDateStr, setTodayDateStr] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [todayDateStr, setTodayDateStr] = useState<string>(getTodayDate());
   const [isOnline, setIsOnline] = useState<boolean | null>(null); // null = checking
 
   const [isBotTyping, setIsBotTyping] = useState(false);
@@ -75,17 +98,28 @@ export default function App() {
       try {
         const todayStr = getTodayDate();
         const { data, error } = await supabase
-          .from('food_entries')
+          .from('food_logs')
           .select('*')
-          .gte('createdAt', `${todayStr}T00:00:00.000Z`)
-          .lte('createdAt', `${todayStr}T23:59:59.999Z`)
-          .order('createdAt', { ascending: false });
+          .eq('date', todayStr)
+          .order('created_at', { ascending: false });
 
         if (error) throw error;
 
+        const mappedData = (data || []).map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          quantity: item.quantity,
+          unit: item.unit,
+          calories: item.calories,
+          protein: item.protein,
+          carbs: item.carbs,
+          fats: item.fats,
+          createdAt: item.created_at
+        }));
+
         setIsOnline(true);
-        setLogs(data || []);
-        localStorage.setItem('food_logs_local', JSON.stringify(data || []));
+        setLogs(mappedData);
+        localStorage.setItem('food_logs_local', JSON.stringify(mappedData));
       } catch (err) {
         console.warn('Unable to fetch logs from Supabase. Falling back to local cache.', err);
         setIsOnline(false);
@@ -95,7 +129,7 @@ export default function App() {
             const allCached = JSON.parse(cached);
             const todayStr = getTodayDate();
             const filtered = allCached.filter((log: FoodEntry) => {
-              const logDate = log.createdAt ? log.createdAt.split('T')[0] : '';
+              const logDate = log.createdAt ? parseLocalDateString(log.createdAt) : '';
               return logDate === todayStr;
             });
             setLogs(filtered);
@@ -150,15 +184,25 @@ export default function App() {
       if (isOnline) {
         try {
           const { data, error } = await supabase
-            .from('food_entries')
+            .from('food_logs')
             .select('*')
-            .gte('createdAt', `${todayStr}T00:00:00.000Z`)
-            .lte('createdAt', `${todayStr}T23:59:59.999Z`)
-            .order('createdAt', { ascending: false });
+            .eq('date', todayStr)
+            .order('created_at', { ascending: false });
 
           if (!error && data) {
-            setLogs(data);
-            localStorage.setItem('food_logs_local', JSON.stringify(data));
+            const mappedData = data.map((item: any) => ({
+              id: item.id,
+              name: item.name,
+              quantity: item.quantity,
+              unit: item.unit,
+              calories: item.calories,
+              protein: item.protein,
+              carbs: item.carbs,
+              fats: item.fats,
+              createdAt: item.created_at
+            }));
+            setLogs(mappedData);
+            localStorage.setItem('food_logs_local', JSON.stringify(mappedData));
             return;
           }
         } catch (err) {
@@ -207,31 +251,42 @@ export default function App() {
           const entriesToSave = items.map((item) => {
             const rawQty = parseFloat(item.quantity) || 1;
             const rawUnit = item.quantity.replace(/^\d+(?:\.\d+)?\s*/, '') || 'piece';
+            const timestamp = action.timestamp || new Date().toISOString();
             return {
               id: crypto.randomUUID(),
               name: item.name || 'Unknown',
               quantity: rawQty,
               unit: rawUnit,
-              baseQuantity: rawQty,
-              baseUnit: rawUnit,
               calories: item.calories || 0,
               protein: item.protein || 0,
               carbs: item.carbs || 0,
               fats: item.fat || 0,
-              createdAt: action.timestamp || new Date().toISOString()
+              created_at: timestamp,
+              date: parseLocalDateString(timestamp)
             };
           });
 
-          const { error } = await supabase.from('food_entries').insert(entriesToSave);
+          const { error } = await supabase.from('food_logs').insert(entriesToSave);
           if (!error) {
+            const localEntries = entriesToSave.map((item) => ({
+              id: item.id,
+              name: item.name,
+              quantity: item.quantity,
+              unit: item.unit,
+              calories: item.calories,
+              protein: item.protein,
+              carbs: item.carbs,
+              fats: item.fats,
+              createdAt: item.created_at
+            }));
             setLogs((prev) => {
               const idx = prev.findIndex((item) => item.id === action.tempId);
               if (idx !== -1) {
                 const updated = [...prev];
-                updated.splice(idx, 1, ...entriesToSave);
+                updated.splice(idx, 1, ...localEntries);
                 return updated;
               }
-              return [...entriesToSave, ...prev];
+              return [...localEntries, ...prev];
             });
             remainingActions.shift();
           } else {
@@ -239,7 +294,7 @@ export default function App() {
           }
         } else if (action.type === 'EDIT' && action.entry) {
           const { error } = await supabase
-            .from('food_entries')
+            .from('food_logs')
             .update({
               name: action.entry.name,
               quantity: action.entry.quantity,
@@ -258,7 +313,7 @@ export default function App() {
           }
         } else if (action.type === 'DELETE') {
           const { error } = await supabase
-            .from('food_entries')
+            .from('food_logs')
             .delete()
             .eq('id', action.id);
 
@@ -281,15 +336,25 @@ export default function App() {
       try {
         const todayStr = getTodayDate();
         const { data, error } = await supabase
-          .from('food_entries')
+          .from('food_logs')
           .select('*')
-          .gte('createdAt', `${todayStr}T00:00:00.000Z`)
-          .lte('createdAt', `${todayStr}T23:59:59.999Z`)
-          .order('createdAt', { ascending: false });
+          .eq('date', todayStr)
+          .order('created_at', { ascending: false });
 
         if (!error && data) {
-          setLogs(data);
-          localStorage.setItem('food_logs_local', JSON.stringify(data));
+          const mappedData = data.map((item: any) => ({
+            id: item.id,
+            name: item.name,
+            quantity: item.quantity,
+            unit: item.unit,
+            calories: item.calories,
+            protein: item.protein,
+            carbs: item.carbs,
+            fats: item.fats,
+            createdAt: item.created_at
+          }));
+          setLogs(mappedData);
+          localStorage.setItem('food_logs_local', JSON.stringify(mappedData));
         }
       } catch (err) {
         console.error('Failed to refresh logs after sync', err);
@@ -469,17 +534,44 @@ export default function App() {
         };
       });
 
+      const dbFoods = finalizedFoods.map((item) => ({
+        id: item.id,
+        name: item.name,
+        quantity: item.quantity,
+        unit: item.unit,
+        calories: item.calories,
+        protein: item.protein,
+        carbs: item.carbs,
+        fats: item.fats,
+        created_at: item.createdAt,
+        date: parseLocalDateString(item.createdAt)
+      }));
+
+      console.log('Sending dbFoods to Supabase:', dbFoods);
+
       // Send batch save to database (Supabase)
       const { data: savedEntries, error } = await supabase
-        .from('food_entries')
-        .insert(finalizedFoods)
+        .from('food_logs')
+        .insert(dbFoods)
         .select();
 
       if (error) {
         throw new Error(`Supabase batch save error: ${error.message}`);
       }
 
-      const confirmedEntries = savedEntries || finalizedFoods;
+      const mappedSaved = (savedEntries || []).map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        quantity: item.quantity,
+        unit: item.unit,
+        calories: item.calories,
+        protein: item.protein,
+        carbs: item.carbs,
+        fats: item.fats,
+        createdAt: item.created_at
+      }));
+
+      const confirmedEntries = mappedSaved.length > 0 ? mappedSaved : finalizedFoods;
 
       // Update logs
       setLogs((prev) => [...confirmedEntries, ...prev]);
@@ -566,7 +658,7 @@ export default function App() {
 
     try {
       const { error } = await supabase
-        .from('food_entries')
+        .from('food_logs')
         .delete()
         .eq('id', id);
       if (error) throw error;
@@ -636,7 +728,7 @@ export default function App() {
 
     try {
       const { error } = await supabase
-        .from('food_entries')
+        .from('food_logs')
         .update({
           name: updatedEntry.name,
           quantity: updatedEntry.quantity,
@@ -686,10 +778,9 @@ export default function App() {
     if (isOnline) {
       try {
         const { error } = await supabase
-          .from('food_entries')
+          .from('food_logs')
           .delete()
-          .gte('createdAt', `${todayStr}T00:00:00.000Z`)
-          .lte('createdAt', `${todayStr}T23:59:59.999Z`);
+          .eq('date', todayStr);
         
         if (error) throw error;
       } catch (err) {
