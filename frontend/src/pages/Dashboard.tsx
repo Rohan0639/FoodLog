@@ -244,6 +244,11 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
       try {
         if (action.type === 'ADD') {
           const parseData = await analyzeFoodClient(action.text!);
+          if (parseData.status === 'invalid') {
+            setLogs((prev) => prev.filter((item) => item.id !== action.tempId));
+            remainingActions.shift();
+            continue;
+          }
           const items = parseData.items || [];
           const entriesToSave = items.map((item) => {
             const rawQty = parseFloat(item.quantity) || 1;
@@ -404,6 +409,17 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
 
     try {
       const parseData = await analyzeFoodClient(text);
+      if (parseData.status === 'invalid') {
+        const botMsg: Message = {
+          id: generateMessageId('bot'),
+          sender: 'bot',
+          text: parseData.reason || "Input is not a valid food item",
+          timestamp: getCurrentDate(),
+        };
+        setMessages((prev) => [...prev, botMsg]);
+        setIsBotTyping(false);
+        return;
+      }
       const items = parseData.items || [];
       const newEntries: FoodEntry[] = items.map((item) => {
         const rawQty = parseFloat(item.quantity) || 1;

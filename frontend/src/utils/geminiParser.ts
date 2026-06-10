@@ -17,9 +17,11 @@ export interface ParsedTotals {
 }
 
 export interface GeminiResponse {
-  reply: string;
-  items: ParsedItem[];
-  totals: ParsedTotals;
+  status: 'valid' | 'invalid';
+  reason?: string;
+  reply?: string;
+  items?: ParsedItem[];
+  totals?: ParsedTotals;
 }
 
 function extractWeightInGramsOrMl(quantityStr: string) {
@@ -45,6 +47,18 @@ function validateGeminiResponse(data: any) {
   if (!data || typeof data !== 'object') {
     throw new Error("Invalid structure: response data is not an object");
   }
+
+  if (data.status === 'invalid') {
+    if (typeof data.reason !== 'string' || !data.reason.trim()) {
+      throw new Error("Invalid structure: missing reason for invalid status");
+    }
+    return;
+  }
+
+  if (data.status !== 'valid') {
+    throw new Error("Invalid structure: missing or invalid status field");
+  }
+
   if (!data.items || !Array.isArray(data.items)) {
     throw new Error("Invalid structure: missing items array");
   }
@@ -142,19 +156,33 @@ export async function analyzeFoodClient(foodText: string): Promise<GeminiRespons
 
   const normalizedInput = normalizeFoodInput(foodText);
 
-  const prompt = `You are a nutrition analysis AI.
+  const prompt = `You are a strict food recognition and calorie estimation assistant.
 
-IMPORTANT:
-- Quantity refers to TOTAL amount, not servings.
-- 200g means 200 grams total, NOT 200 × 100g.
+Step 1: Validate the input.
+- Check if the user input describes real, edible food or drink.
+- If the input is not food (e.g., objects, people, jokes, unrealistic items like "my friend", "stone", "car", etc.), DO NOT estimate calories.
 
-Return ONLY valid JSON in this format:
+Step 2: If invalid:
+- Respond ONLY with:
 {
-  "reply": "A friendly, conversational response to the user. Greet them warmly if they say hi/hello. If they log foods, confirm what you've logged and maybe add a short, helpful health/nutrition tip. If they ask a general question, answer/reply to them helpfuly.",
+  "status": "invalid",
+  "reason": "Input is not a valid food item"
+}
+
+Step 3: If valid:
+- Extract food items and estimate realistic calorie values.
+- Avoid extreme or unrealistic calorie values.
+
+Respond ONLY in JSON format.
+
+Valid response format:
+{
+  "status": "valid",
+  "reply": "A friendly confirmation or response message summarizing the food and macros, and maybe a helpful tip.",
   "items": [
     {
-      "name": "string",
-      "quantity": "string",
+      "name": "food name",
+      "quantity": "string quantity description (e.g. 1 apple, 100g, etc.)",
       "calories": number,
       "protein": number,
       "carbs": number,
@@ -169,14 +197,14 @@ Return ONLY valid JSON in this format:
   }
 }
 
-Use realistic values:
+Use realistic values for macros and calories:
 - Max calories per gram ≤ 9 kcal
 - Ensure macros match calories:
   calories ≈ (protein×4 + carbs×4 + fat×9)
 
 No explanation. Only JSON.
 
-Sentence: "${normalizedInput.replace(/"/g, '\\"')}"`;
+Sentence to analyze: "${normalizedInput.replace(/"/g, '\\"')}"`;
 
   const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
     method: 'POST',
