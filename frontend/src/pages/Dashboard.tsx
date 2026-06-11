@@ -785,7 +785,6 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
         console.error('Failed to clear daily entries:', err);
       }
     }
-
     localStorage.setItem(`food_logs_local_${user.id}`, JSON.stringify([]));
     
     const resetMsg: Message = {
@@ -798,8 +797,8 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
   };
 
   return (
-    <div className="flex flex-col h-screen w-full overflow-hidden bg-black text-white">
-      {/* Navbar Display */}
+    <div className="flex flex-col w-full overflow-hidden bg-black text-white" style={{ height: '100dvh' }}>
+      {/* Navbar */}
       <Navbar
         userEmail={user.email}
         isOnline={isOnline}
@@ -809,7 +808,7 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
         hasLogs={logs.length > 0}
       />
 
-      <div className="flex-1 flex flex-row overflow-hidden relative">
+      <div className="flex-1 flex flex-row overflow-hidden relative min-h-0">
         {/* Left Logger Column */}
         <FoodLogger
           messages={messages}
@@ -824,8 +823,11 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
           messagesEndRef={messagesEndRef}
         />
 
-        {/* Desktop Dashboard panel */}
-        <div className="hidden lg:block w-[320px] xl:w-[350px] h-full shrink-0">
+        {/* Desktop Dashboard panel — fluid width, never overflows */}
+        <div
+          className="hidden lg:flex h-full shrink-0 flex-col"
+          style={{ width: 'clamp(280px, 28vw, 360px)' }}
+        >
           <NutritionDashboard
             key={todayDateStr}
             logs={logs}
@@ -838,24 +840,27 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
 
         {/* Mobile Drawer Slide-over Panel */}
         {isDashboardOpenMobile && (
-          <div className="lg:hidden fixed inset-0 z-50 flex justify-end animate-fade-in">
+          <div className="lg:hidden fixed inset-0 z-50 flex justify-end">
+            {/* Backdrop */}
             <div
               onClick={() => setIsDashboardOpenMobile(false)}
-              className="absolute inset-0 bg-black/85 backdrop-blur-sm transition-opacity duration-300"
+              className="absolute inset-0 bg-black/85 backdrop-blur-sm"
             />
-            
-            <div className="relative w-80 max-w-[85%] h-full bg-black border-l border-zinc-900 shadow-2xl flex flex-col animate-slide-up">
-              <div className="h-full">
-                <NutritionDashboard
-                  key={todayDateStr}
-                  logs={logs}
-                  dailyGoal={dailyGoal}
-                  onDeleteFoodLog={handleDeleteFoodEntry}
-                  onUpdateFoodLog={handleUpdateFoodEntry}
-                  onClearAll={handleClearAll}
-                  onCloseMobile={() => setIsDashboardOpenMobile(false)}
-                />
-              </div>
+
+            {/* Panel — capped at 85vw so it never fills entire narrow screen */}
+            <div
+              className="relative h-full bg-black border-l border-zinc-900 shadow-2xl flex flex-col drawer-enter overflow-hidden"
+              style={{ width: 'min(85vw, 360px)' }}
+            >
+              <NutritionDashboard
+                key={todayDateStr}
+                logs={logs}
+                dailyGoal={dailyGoal}
+                onDeleteFoodLog={handleDeleteFoodEntry}
+                onUpdateFoodLog={handleUpdateFoodEntry}
+                onClearAll={handleClearAll}
+                onCloseMobile={() => setIsDashboardOpenMobile(false)}
+              />
             </div>
           </div>
         )}

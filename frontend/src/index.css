@@ -2,20 +2,65 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Global Reset ───────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* ─── Fluid Design Tokens ────────────────────────────────── */
+:root {
+  /* Font scale: min 12px → max 16px */
+  --fs-xs:   clamp(0.625rem, 1.8vw, 0.75rem);
+  --fs-sm:   clamp(0.75rem,  2vw,   0.875rem);
+  --fs-base: clamp(0.8125rem, 2.2vw, 0.9375rem);
+  --fs-md:   clamp(0.875rem, 2.4vw, 1rem);
+
+  /* Icon sizes */
+  --icon-xs:  clamp(12px, 3vw, 16px);
+  --icon-sm:  clamp(14px, 3.5vw, 18px);
+  --icon-md:  clamp(18px, 4.5vw, 24px);
+  --icon-lg:  clamp(22px, 5.5vw, 32px);
+
+  /* Spacing tokens */
+  --sp-1: clamp(4px,  1vw, 6px);
+  --sp-2: clamp(6px,  1.5vw, 10px);
+  --sp-3: clamp(8px,  2vw, 14px);
+  --sp-4: clamp(12px, 3vw, 20px);
+
+  /* Avatar/badge */
+  --avatar-sm: clamp(28px, 7vw, 36px);
+  --avatar-md: clamp(32px, 8vw, 40px);
+
+  /* Navbar height */
+  --navbar-h: clamp(52px, 10vw, 64px);
+}
+
 @layer base {
+  html {
+    overflow-x: hidden;
+  }
+
   body {
-    @apply bg-black text-white antialiased font-sans m-0 p-0 overflow-hidden h-screen;
+    @apply bg-black text-white antialiased font-sans m-0 p-0;
+    overflow-x: hidden;
+    overflow-y: hidden;
+    height: 100dvh; /* use dvh so mobile chrome bottom bar is accounted for */
   }
 
   #root {
-    @apply min-h-screen w-full flex flex-col m-0 p-0 max-w-none text-left border-none;
+    @apply flex flex-col m-0 p-0 max-w-none text-left border-none;
+    min-height: 100dvh;
+    width: 100%;
+    overflow-x: hidden;
   }
 }
 
-/* Custom scrollbar styling for a cleaner look */
+/* ─── Custom Scrollbar ──────────────────────────────────── */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 4px;
+  height: 4px;
 }
 
 ::-webkit-scrollbar-track {
@@ -31,7 +76,7 @@
   background: rgba(255, 255, 255, 0.3);
 }
 
-/* Custom styling for glassmorphism panels - strictly black and white */
+/* ─── Glassmorphism ─────────────────────────────────────── */
 .glass {
   background: rgba(10, 10, 10, 0.8);
   backdrop-filter: blur(12px);
@@ -44,4 +89,13 @@
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* ─── Mobile Drawer Slide Transition ───────────────────── */
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);   opacity: 1; }
+}
+.drawer-enter {
+  animation: slideInRight 0.22s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
 }

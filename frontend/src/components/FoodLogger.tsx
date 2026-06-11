@@ -34,9 +34,12 @@ export default function FoodLogger({
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden relative">
+    <div className="flex-1 flex flex-col overflow-hidden relative min-h-0 min-w-0">
       {/* Chat Thread */}
-      <div className="flex-1 overflow-y-auto px-2 py-4 space-y-2 max-w-2xl mx-auto w-full">
+      <div
+        className="flex-1 overflow-y-auto space-y-2 max-w-2xl mx-auto w-full min-h-0"
+        style={{ padding: 'clamp(8px, 2vw, 16px)' }}
+      >
         {messages.length === 1 && logs.length === 0 ? (
           <EmptyState onSelectSuggestion={handleSelectSuggestion} />
         ) : (
