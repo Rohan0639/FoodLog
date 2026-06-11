@@ -18,7 +18,7 @@ export const EditFoodModal: React.FC<EditFoodModalProps> = ({
 }) => {
   const [name, setName] = useState(entry.name);
   const [quantity, setQuantity] = useState<number>(entry.quantity);
-  const [unit, setUnit] = useState(entry.unit);
+  const [unit, setUnit] = useState(entry.unit || 'g');
 
   const [calories, setCalories] = useState(entry.calories);
   const [protein, setProtein] = useState(entry.protein);
@@ -36,7 +36,7 @@ export const EditFoodModal: React.FC<EditFoodModalProps> = ({
 
     try {
       // Convert new quantity in new unit back to original base unit
-      const scaledQuantity = convertUnit(quantity, unit, entry.unit, entry.name);
+      const scaledQuantity = convertUnit(quantity, unit || 'g', entry.unit || 'g', entry.name);
       
       // Calculate scale factor relative to the base entry values
       const scale = scaledQuantity / entry.quantity;
@@ -148,10 +148,13 @@ export const EditFoodModal: React.FC<EditFoodModalProps> = ({
                 Unit
               </label>
               <select
-                value={unit}
+                value={unit || 'g'}
                 onChange={(e) => setUnit(e.target.value)}
                 className="w-full px-3 py-2 bg-black border border-zinc-850 focus:border-white rounded-xl text-xs text-white focus:outline-none transition-all duration-200 select-arrow"
               >
+                {unit && !Object.values(UNIT_CATEGORIES).flat().includes(unit) && (
+                  <option value={unit}>{unit}</option>
+                )}
                 <optgroup label="Count" className="bg-zinc-950">
                   {UNIT_CATEGORIES.count.map((u) => (
                     <option key={u} value={u}>

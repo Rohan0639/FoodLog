@@ -46,9 +46,9 @@ export const ReviewConfirmTable: React.FC<ReviewConfirmTableProps> = ({
       return { calories: 0, protein: 0, carbs: 0, fats: 0 };
     }
     try {
-      const baseUnit = item.baseUnit || item.unit;
+      const baseUnit = item.baseUnit || item.unit || 'g';
       const baseQty = item.baseQuantity || item.quantity;
-      const scaledQuantity = convertUnit(quantity, item.unit, baseUnit, item.name);
+      const scaledQuantity = convertUnit(quantity, item.unit || 'g', baseUnit, item.name);
       const scale = scaledQuantity / baseQty;
 
       return {
@@ -130,11 +130,14 @@ export const ReviewConfirmTable: React.FC<ReviewConfirmTableProps> = ({
                           placeholder="0"
                         />
                         <select
-                          value={food.unit}
+                          value={food.unit || 'g'}
                           disabled={disabled}
                           onChange={(e) => handleUnitChange(food.id, e.target.value)}
                           className="px-1 sm:px-1.5 py-1 bg-zinc-900/60 border border-zinc-800 rounded-lg text-white focus:outline-none focus:border-zinc-500 disabled:opacity-55 disabled:cursor-not-allowed text-[11px] sm:text-xs cursor-pointer select-arrow pr-3 min-[370px]:pr-4"
                         >
+                          {food.unit && !['g', 'ml', 'piece', 'cup'].includes(food.unit) && (
+                            <option value={food.unit}>{food.unit}</option>
+                          )}
                           <option value="g">g</option>
                           <option value="ml">ml</option>
                           <option value="piece">piece</option>
