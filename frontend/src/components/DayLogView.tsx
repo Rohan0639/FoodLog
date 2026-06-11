@@ -45,15 +45,15 @@ export const DayLogView: React.FC<DayLogViewProps> = ({
       </div>
 
       {isLoading ? (
-        <div className="py-8 text-center text-zinc-550 text-xs font-mono animate-pulse">
+        <div className="py-8 text-center text-zinc-500 text-xs font-mono animate-pulse">
           Loading logs...
         </div>
       ) : items.length === 0 ? (
         /* Empty State */
         <div className="flex flex-col items-center justify-center p-8 border border-dashed border-zinc-900 rounded-2xl text-center">
-          <Target className="w-6 h-6 text-zinc-650 mb-2" />
-          <p className="text-xs text-zinc-450 font-semibold">No logs for this day</p>
-          <p className="text-[10px] text-zinc-600 mt-1 max-w-[170px] font-medium leading-relaxed">
+          <Target className="w-6 h-6 text-zinc-600 mb-2" />
+          <p className="text-xs text-zinc-400 font-semibold">No logs for this day</p>
+          <p className="text-[10px] text-zinc-650 mt-1 max-w-[170px] font-medium leading-relaxed">
             There are no recorded food entries on this calendar date.
           </p>
         </div>
@@ -62,14 +62,14 @@ export const DayLogView: React.FC<DayLogViewProps> = ({
           {/* Daily macro totals summary card */}
           <div className="p-3 sm:p-4 bg-zinc-950 border border-zinc-900 rounded-2xl space-y-2.5 shadow-inner">
             <div className="flex justify-between items-baseline">
-              <span className="text-[10px] font-black text-zinc-550 uppercase tracking-wider font-mono">
+              <span className="text-[10px] font-black text-zinc-500 uppercase tracking-wider font-mono">
                 Total Intake Summary
               </span>
               <span className="text-xl font-bold font-mono text-white">
                 {totalCalories} <span className="text-xs text-zinc-500 font-mono">kcal</span>
               </span>
             </div>
-            <div className="flex justify-between text-[10px] text-zinc-450 font-mono">
+            <div className="flex justify-between text-[10px] text-zinc-400 font-mono">
               <span>Protein: <strong className="text-zinc-200 font-semibold">{totalProtein}g</strong></span>
               <span>Carbs: <strong className="text-zinc-200 font-semibold">{totalCarbs}g</strong></span>
               <span>Fat: <strong className="text-zinc-200 font-semibold">{totalFats}g</strong></span>
@@ -95,7 +95,7 @@ export const DayLogView: React.FC<DayLogViewProps> = ({
                       <div className="flex gap-2 text-[10px]">
                         <button
                           onClick={() => setDeleteConfirmId(null)}
-                          className="px-3 py-1.5 rounded-lg border border-zinc-850 text-zinc-400 hover:text-white transition-all duration-200"
+                          className="px-3 py-1.5 rounded-lg border border-zinc-800 text-zinc-400 hover:text-white transition-all duration-200"
                         >
                           Cancel
                         </button>
@@ -116,10 +116,10 @@ export const DayLogView: React.FC<DayLogViewProps> = ({
                         <p className="text-xs font-bold text-zinc-200 truncate capitalize max-w-[140px]" title={item.name}>
                           {item.name}
                         </p>
-                        <p className="text-[10px] text-zinc-450 font-bold truncate mt-1">
+                        <p className="text-[10px] text-zinc-400 font-bold truncate mt-1">
                           {item.quantity} {item.unit}
                         </p>
-                        <p className="text-[9px] text-zinc-550 mt-1.5 font-bold font-mono">
+                        <p className="text-[9px] text-zinc-500 mt-1.5 font-bold font-mono">
                           P: {item.protein}g • C: {item.carbs}g • F: {item.fats}g
                         </p>
                       </div>

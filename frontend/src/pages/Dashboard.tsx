@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import type { Message, DailyGoal, OfflineAction, FoodEntry } from '../types';
 import { convertUnit } from '../utils/unitConverter';
-import { X } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { supabase } from '../lib/supabase';
 import { analyzeFoodClient } from '../utils/geminiParser';
@@ -846,13 +845,7 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
             />
             
             <div className="relative w-80 max-w-[85%] h-full bg-black border-l border-zinc-900 shadow-2xl flex flex-col animate-slide-up">
-              <button
-                onClick={() => setIsDashboardOpenMobile(false)}
-                className="absolute top-4 right-4 p-1.5 rounded-lg border border-zinc-850 bg-zinc-900 text-zinc-400 hover:text-white z-25 transition-all duration-200"
-              >
-                <X className="w-4 h-4" />
-              </button>
-              <div className="h-full pt-4">
+              <div className="h-full">
                 <NutritionDashboard
                   key={todayDateStr}
                   logs={logs}
@@ -860,6 +853,7 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
                   onDeleteFoodLog={handleDeleteFoodEntry}
                   onUpdateFoodLog={handleUpdateFoodEntry}
                   onClearAll={handleClearAll}
+                  onCloseMobile={() => setIsDashboardOpenMobile(false)}
                 />
               </div>
             </div>

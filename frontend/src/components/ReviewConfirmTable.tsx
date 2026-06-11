@@ -83,7 +83,7 @@ export const ReviewConfirmTable: React.FC<ReviewConfirmTableProps> = ({
   );
 
   return (
-    <div className="w-full mt-2 rounded-2xl bg-zinc-950 border border-zinc-850 p-2.5 sm:p-4 space-y-3 sm:space-y-4 shadow-xl animate-fade-in text-white font-sans max-w-lg">
+    <div className="w-full mt-2 rounded-2xl bg-zinc-950 border border-zinc-800 p-2.5 sm:p-4 space-y-3 sm:space-y-4 shadow-xl animate-fade-in text-white font-sans max-w-lg">
       {/* Title Header */}
       <div className="pb-2.5 border-b border-zinc-900 flex flex-col gap-1">
         <span className="text-xs font-black tracking-widest text-[#FF7E67] uppercase font-sans">
@@ -96,82 +96,144 @@ export const ReviewConfirmTable: React.FC<ReviewConfirmTableProps> = ({
           No food items to log. Add some foods or discard.
         </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-zinc-900 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-zinc-500">
-                <th className="pb-2 font-semibold">Food Item</th>
-                <th className="pb-2 font-semibold pl-2 sm:pl-4">Qty</th>
-                <th className="pb-2 text-right font-semibold">Nutrition Info</th>
-                <th className="pb-2 text-right w-8"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-900 text-xs">
-              {foods.map((food) => {
-                const scaled = getScaledMacros(food);
-                return (
-                  <tr key={food.id} className="hover:bg-zinc-900/20 transition-colors">
-                    {/* Food Name */}
-                    <td className="py-2.5 sm:py-3 pr-1 sm:pr-2 font-medium capitalize max-w-[90px] min-[370px]:max-w-[120px] truncate" title={food.name}>
+        <>
+          {/* Mobile Card List View */}
+          <div className="block sm:hidden space-y-2.5 max-h-64 overflow-y-auto pr-1">
+            {foods.map((food) => {
+              const scaled = getScaledMacros(food);
+              return (
+                <div key={food.id} className="p-3 bg-zinc-900/40 border border-zinc-800 rounded-xl space-y-2 relative">
+                  <div className="flex justify-between items-start">
+                    <span className="font-semibold text-zinc-200 capitalize truncate pr-6 text-xs" title={food.name}>
                       {food.name}
-                    </td>
-
-                    {/* Qty Editable Input + Unit Selector */}
-                    <td className="py-2.5 sm:py-3 pl-2 sm:pl-4">
-                      <div className="flex items-center gap-1 sm:gap-1.5">
-                        <input
-                          type="number"
-                          step="any"
-                          min="0"
-                          disabled={disabled}
-                          value={food.quantity === 0 ? '' : food.quantity}
-                          onChange={(e) => handleQtyChange(food.id, e.target.value)}
-                          className="w-11 min-[370px]:w-14 px-1 sm:px-1.5 py-1 text-center bg-zinc-900/60 border border-zinc-800 rounded-lg text-white font-mono focus:outline-none focus:border-zinc-500 disabled:opacity-55 disabled:cursor-not-allowed text-[11px] sm:text-xs"
-                          placeholder="0"
-                        />
-                        <select
-                          value={food.unit || 'g'}
-                          disabled={disabled}
-                          onChange={(e) => handleUnitChange(food.id, e.target.value)}
-                          className="px-1 sm:px-1.5 py-1 bg-zinc-900/60 border border-zinc-800 rounded-lg text-white focus:outline-none focus:border-zinc-500 disabled:opacity-55 disabled:cursor-not-allowed text-[11px] sm:text-xs cursor-pointer select-arrow pr-3 min-[370px]:pr-4"
-                        >
-                          {food.unit && !['g', 'ml', 'piece', 'cup'].includes(food.unit) && (
-                            <option value={food.unit}>{food.unit}</option>
-                          )}
-                          <option value="g">g</option>
-                          <option value="ml">ml</option>
-                          <option value="piece">piece</option>
-                          <option value="cup">cup</option>
-                        </select>
-                      </div>
-                    </td>
-
-                    {/* Dynamic Nutrition calculations */}
-                    <td className="py-2.5 sm:py-3 text-right font-mono">
-                      <div className="text-white font-bold text-[11px] sm:text-xs">{scaled.calories} kcal</div>
-                      <div className="text-[8px] sm:text-[9px] text-zinc-400 mt-0.5">
+                    </span>
+                    <button
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => handleDeleteRow(food.id)}
+                      className="absolute top-2.5 right-2.5 text-zinc-500 hover:text-red-400 hover:bg-zinc-900/50 p-1 rounded-md transition-all duration-150"
+                      title="Delete item"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                    <div className="flex items-center gap-1 sm:gap-1.5">
+                      <input
+                        type="number"
+                        step="any"
+                        min="0"
+                        disabled={disabled}
+                        value={food.quantity === 0 ? '' : food.quantity}
+                        onChange={(e) => handleQtyChange(food.id, e.target.value)}
+                        className="w-11 px-1 py-0.5 text-center bg-zinc-900/60 border border-zinc-800 rounded-lg text-white font-mono focus:outline-none focus:border-zinc-500 disabled:opacity-55 disabled:cursor-not-allowed text-[11px]"
+                        placeholder="0"
+                      />
+                      <select
+                        value={food.unit || 'g'}
+                        disabled={disabled}
+                        onChange={(e) => handleUnitChange(food.id, e.target.value)}
+                        className="px-1 py-0.5 bg-zinc-900/60 border border-zinc-800 rounded-lg text-white focus:outline-none focus:border-zinc-500 disabled:opacity-55 disabled:cursor-not-allowed text-[11px] cursor-pointer select-arrow pr-3.5"
+                      >
+                        {food.unit && !['g', 'ml', 'piece', 'cup'].includes(food.unit) && (
+                          <option value={food.unit}>{food.unit}</option>
+                        )}
+                        <option value="g">g</option>
+                        <option value="ml">ml</option>
+                        <option value="piece">piece</option>
+                        <option value="cup">cup</option>
+                      </select>
+                    </div>
+                    <div className="text-right font-mono">
+                      <div className="text-white font-bold text-[11px]">{scaled.calories} kcal</div>
+                      <div className="text-[8.5px] text-zinc-400 mt-0.5">
                         P:{scaled.protein}g | C:{scaled.carbs}g | F:{scaled.fats}g
                       </div>
-                    </td>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
 
-                    {/* Row Delete Button */}
-                    <td className="py-2.5 sm:py-3 text-right pl-1.5 sm:pl-2">
-                      <button
-                        type="button"
-                        disabled={disabled}
-                        onClick={() => handleDeleteRow(food.id)}
-                        className="text-zinc-500 hover:text-red-400 hover:bg-zinc-900/50 p-1 rounded-md transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation"
-                        title="Delete item"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+          {/* Desktop/Tablet Table View */}
+          <div className="hidden sm:block overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-zinc-900 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                  <th className="pb-2 font-semibold">Food Item</th>
+                  <th className="pb-2 font-semibold pl-2 sm:pl-4">Qty</th>
+                  <th className="pb-2 text-right font-semibold">Nutrition Info</th>
+                  <th className="pb-2 text-right w-8"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-900 text-xs">
+                {foods.map((food) => {
+                  const scaled = getScaledMacros(food);
+                  return (
+                    <tr key={food.id} className="hover:bg-zinc-900/20 transition-colors">
+                      {/* Food Name */}
+                      <td className="py-2.5 sm:py-3 pr-1 sm:pr-2 font-medium capitalize max-w-[90px] min-[370px]:max-w-[120px] truncate" title={food.name}>
+                        {food.name}
+                      </td>
+
+                      {/* Qty Editable Input + Unit Selector */}
+                      <td className="py-2.5 sm:py-3 pl-2 sm:pl-4">
+                        <div className="flex items-center gap-1 sm:gap-1.5">
+                          <input
+                            type="number"
+                            step="any"
+                            min="0"
+                            disabled={disabled}
+                            value={food.quantity === 0 ? '' : food.quantity}
+                            onChange={(e) => handleQtyChange(food.id, e.target.value)}
+                            className="w-11 min-[370px]:w-14 px-1 sm:px-1.5 py-1 text-center bg-zinc-900/60 border border-zinc-800 rounded-lg text-white font-mono focus:outline-none focus:border-zinc-500 disabled:opacity-55 disabled:cursor-not-allowed text-[11px] sm:text-xs"
+                            placeholder="0"
+                          />
+                          <select
+                            value={food.unit || 'g'}
+                            disabled={disabled}
+                            onChange={(e) => handleUnitChange(food.id, e.target.value)}
+                            className="px-1 sm:px-1.5 py-1 bg-zinc-900/60 border border-zinc-800 rounded-lg text-white focus:outline-none focus:border-zinc-500 disabled:opacity-55 disabled:cursor-not-allowed text-[11px] sm:text-xs cursor-pointer select-arrow pr-3 min-[370px]:pr-4"
+                          >
+                            {food.unit && !['g', 'ml', 'piece', 'cup'].includes(food.unit) && (
+                              <option value={food.unit}>{food.unit}</option>
+                            )}
+                            <option value="g">g</option>
+                            <option value="ml">ml</option>
+                            <option value="piece">piece</option>
+                            <option value="cup">cup</option>
+                          </select>
+                        </div>
+                      </td>
+
+                      {/* Dynamic Nutrition calculations */}
+                      <td className="py-2.5 sm:py-3 text-right font-mono">
+                        <div className="text-white font-bold text-[11px] sm:text-xs">{scaled.calories} kcal</div>
+                        <div className="text-[8px] sm:text-[9px] text-zinc-400 mt-0.5">
+                          P:{scaled.protein}g | C:{scaled.carbs}g | F:{scaled.fats}g
+                        </div>
+                      </td>
+
+                      {/* Row Delete Button */}
+                      <td className="py-2.5 sm:py-3 text-right pl-1.5 sm:pl-2">
+                        <button
+                          type="button"
+                          disabled={disabled}
+                          onClick={() => handleDeleteRow(food.id)}
+                          className="text-zinc-500 hover:text-red-400 hover:bg-zinc-900/50 p-1 rounded-md transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation"
+                          title="Delete item"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
 
       {/* Dynamic Summary Row */}
@@ -181,7 +243,7 @@ export const ReviewConfirmTable: React.FC<ReviewConfirmTableProps> = ({
             <span>Total Estimated Intake</span>
             <span className="font-mono text-white text-sm">{totals.calories} kcal</span>
           </div>
-          <div className="flex justify-between text-[10px] text-zinc-450 font-mono pl-0">
+          <div className="flex justify-between text-[10px] text-zinc-400 font-mono pl-0">
             <span>Protein: <strong className="text-zinc-300 font-semibold">{Math.round(totals.protein * 10) / 10}g</strong></span>
             <span>Carbs: <strong className="text-zinc-300 font-semibold">{Math.round(totals.carbs * 10) / 10}g</strong></span>
             <span>Fat: <strong className="text-zinc-300 font-semibold">{Math.round(totals.fats * 10) / 10}g</strong></span>
@@ -204,7 +266,7 @@ export const ReviewConfirmTable: React.FC<ReviewConfirmTableProps> = ({
           type="button"
           disabled={disabled}
           onClick={onDiscard}
-          className="flex-1 px-2.5 py-2.5 rounded-xl border border-zinc-850 hover:border-zinc-700 bg-transparent text-white flex items-center justify-center gap-1 sm:gap-1.5 active:scale-98 transition-all disabled:opacity-45 disabled:cursor-not-allowed touch-manipulation"
+          className="flex-1 px-2.5 py-2.5 rounded-xl border border-zinc-800 hover:border-zinc-700 bg-transparent text-white flex items-center justify-center gap-1 sm:gap-1.5 active:scale-98 transition-all disabled:opacity-45 disabled:cursor-not-allowed touch-manipulation"
         >
           <X className="w-4 h-4 shrink-0" />
           <span>DISCARD</span>

@@ -89,7 +89,7 @@ export const EditFoodModal: React.FC<EditFoodModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
-      <div className="relative w-full max-w-md bg-zinc-950 border border-zinc-850 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-slide-up">
+      <div className="relative w-full max-w-md bg-zinc-950 border border-zinc-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-slide-up">
         {/* Header */}
         <div className="p-4 border-b border-zinc-900 flex justify-between items-center bg-black/50">
           <h3 className="font-bold text-sm text-white uppercase tracking-wider">
@@ -99,7 +99,7 @@ export const EditFoodModal: React.FC<EditFoodModalProps> = ({
             onClick={onClose}
             className="p-1 rounded-lg hover:bg-zinc-900 text-zinc-400 hover:text-white transition-all duration-200"
           >
-            <X className="w-4.5 h-4.5" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
@@ -121,7 +121,7 @@ export const EditFoodModal: React.FC<EditFoodModalProps> = ({
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 bg-black border border-zinc-850 focus:border-white rounded-xl text-xs text-white placeholder-zinc-700 focus:outline-none transition-all duration-200"
+              className="w-full px-3 py-2 bg-black border border-zinc-800 focus:border-white rounded-xl text-xs text-white placeholder-zinc-700 focus:outline-none transition-all duration-200"
               placeholder="e.g., Banana, Boiled Egg"
             />
           </div>
@@ -138,7 +138,7 @@ export const EditFoodModal: React.FC<EditFoodModalProps> = ({
                 min="0.001"
                 value={quantity}
                 onChange={(e) => setQuantity(parseFloat(e.target.value) || 0)}
-                className="w-full px-3 py-2 bg-black border border-zinc-850 focus:border-white rounded-xl text-xs text-white focus:outline-none transition-all duration-200"
+                className="w-full px-3 py-2 bg-black border border-zinc-800 focus:border-white rounded-xl text-xs text-white focus:outline-none transition-all duration-200"
               />
             </div>
 
@@ -150,7 +150,7 @@ export const EditFoodModal: React.FC<EditFoodModalProps> = ({
               <select
                 value={unit || 'g'}
                 onChange={(e) => setUnit(e.target.value)}
-                className="w-full px-3 py-2 bg-black border border-zinc-850 focus:border-white rounded-xl text-xs text-white focus:outline-none transition-all duration-200 select-arrow"
+                className="w-full px-3 py-2 bg-black border border-zinc-800 focus:border-white rounded-xl text-xs text-white focus:outline-none transition-all duration-200 select-arrow"
               >
                 {unit && !Object.values(UNIT_CATEGORIES).flat().includes(unit) && (
                   <option value={unit}>{unit}</option>
@@ -182,7 +182,7 @@ export const EditFoodModal: React.FC<EditFoodModalProps> = ({
 
           {/* Recalculated Macros Preview */}
           <div className="p-3 bg-black rounded-xl border border-zinc-900 space-y-2">
-            <span className="text-[9px] font-bold text-zinc-550 uppercase tracking-wider font-mono">
+            <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider font-mono">
               Live Macro Recalculation
             </span>
             <div className="grid grid-cols-4 gap-2 text-center">
@@ -211,7 +211,7 @@ export const EditFoodModal: React.FC<EditFoodModalProps> = ({
               type="button"
               onClick={onClose}
               disabled={isSaving}
-              className="px-3.5 py-2 rounded-xl border border-zinc-850 hover:border-zinc-700 text-zinc-400 hover:text-white transition-all duration-200"
+              className="px-3.5 py-2 rounded-xl border border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-white transition-all duration-200"
             >
               Cancel
             </button>

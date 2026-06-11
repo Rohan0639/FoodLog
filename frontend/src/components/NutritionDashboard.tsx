@@ -11,7 +11,7 @@ import { EditFoodModal } from './EditFoodModal';
 import { CalendarView } from './CalendarView';
 import { HistoryStatsView } from './HistoryStatsView';
 import { DayLogView } from './DayLogView';
-import { Flame, Trash2, Edit2, Calendar, Target, RefreshCw, BarChart2, AlertTriangle, History } from 'lucide-react';
+import { Flame, Trash2, Edit2, Calendar, Target, RefreshCw, BarChart2, AlertTriangle, History, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface NutritionDashboardProps {
@@ -20,6 +20,7 @@ interface NutritionDashboardProps {
   onDeleteFoodLog: (id: string) => void;
   onUpdateFoodLog: (updatedEntry: FoodEntry) => Promise<void>;
   onClearAll: () => void;
+  onCloseMobile?: () => void;
 }
 
 export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
@@ -28,6 +29,7 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
   onDeleteFoodLog,
   onUpdateFoodLog,
   onClearAll,
+  onCloseMobile,
 }) => {
   const [activeTab, setActiveTab] = useState<'today' | 'history'>('today');
   const [activeEditEntry, setActiveEditEntry] = useState<FoodEntry | null>(null);
@@ -283,8 +285,17 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
       {/* Tab Header */}
       <div className="p-3 sm:p-4 border-b border-zinc-900 flex justify-between items-center bg-black/85 top-0 backdrop-blur-md z-10 sticky">
         <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-lg bg-zinc-900 text-white border border-zinc-850">
-            <BarChart2 className="w-4.5 h-4.5" />
+          {onCloseMobile && (
+            <button
+              onClick={onCloseMobile}
+              className="lg:hidden p-1.5 rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-white transition-all duration-200 mr-1"
+              title="Close Panel"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+          <div className="p-1.5 rounded-lg bg-zinc-900 text-white border border-zinc-800">
+            <BarChart2 className="w-4 h-4" />
           </div>
           <div>
             <h3 className="font-semibold text-sm text-white leading-tight">Tracker Log</h3>
@@ -308,7 +319,7 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
           <button
             onClick={onClearAll}
             title="Clear all logged items"
-            className="text-xs text-zinc-450 hover:text-white hover:bg-zinc-900 px-2.5 py-1.5 rounded-lg border border-zinc-900 hover:border-zinc-800 transition-all duration-200 flex items-center gap-1.5"
+            className="text-xs text-zinc-400 hover:text-white hover:bg-zinc-900 px-2.5 py-1.5 rounded-lg border border-zinc-900 hover:border-zinc-800 transition-all duration-200 flex items-center gap-1.5"
           >
             <RefreshCw className="w-3.5 h-3.5" />
             <span>Reset</span>
@@ -346,7 +357,7 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
           /* ---------------- TODAY VIEW ---------------- */
           <>
             {/* Calorie Stats Card */}
-            <div className="p-3 sm:p-4 rounded-2xl bg-zinc-950 border border-zinc-850 shadow-sm relative overflow-hidden">
+            <div className="p-3 sm:p-4 rounded-2xl bg-zinc-950 border border-zinc-800 shadow-sm relative overflow-hidden">
               <div className="flex justify-between items-baseline mb-2">
                 <span className="text-xs font-bold text-zinc-400 flex items-center gap-1.5 uppercase tracking-wide">
                   <Flame className="w-4 h-4 text-white" />
@@ -365,7 +376,7 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
                   style={{ width: `${calPercent * 100}%` }}
                 />
               </div>
-              <div className="flex justify-between text-[10px] text-zinc-455 font-bold font-mono">
+              <div className="flex justify-between text-[10px] text-zinc-400 font-bold font-mono">
                 <span>{Math.round(calPercent * 100)}%</span>
                 <span>{Math.max(0, dailyGoal.calories - totalCalories)} kcal left</span>
               </div>
@@ -377,7 +388,7 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
                 Macronutrients
               </span>
               
-              <div className="space-y-3.5 bg-zinc-950 border border-zinc-850 rounded-2xl p-3 sm:p-4">
+              <div className="space-y-3.5 bg-zinc-950 border border-zinc-800 rounded-2xl p-3 sm:p-4">
                 {/* Protein */}
                 <div>
                   <div className="flex justify-between text-xs mb-1.5">
@@ -444,10 +455,10 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
               </span>
               
               {logs.length === 0 ? (
-                <div className="flex flex-col items-center justify-center p-8 border border-dashed border-zinc-850 rounded-2xl text-center">
+                <div className="flex flex-col items-center justify-center p-8 border border-dashed border-zinc-800 rounded-2xl text-center">
                   <Target className="w-6 h-6 text-zinc-600 mb-2" />
-                  <p className="text-xs text-zinc-450 font-semibold">Nothing logged yet</p>
-                  <p className="text-[10px] text-zinc-550 mt-1 max-w-[150px] font-medium leading-relaxed">
+                  <p className="text-xs text-zinc-400 font-semibold">Nothing logged yet</p>
+                  <p className="text-[10px] text-zinc-500 mt-1 max-w-[150px] font-medium leading-relaxed">
                     Logged food entries will list here.
                   </p>
                 </div>
@@ -459,7 +470,7 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
                     return (
                       <div
                         key={item.id}
-                        className="flex flex-col p-3 rounded-xl border border-zinc-900 bg-zinc-950 hover:border-zinc-850 hover:bg-zinc-900 group transition-all duration-150 gap-2 relative overflow-hidden"
+                        className="flex flex-col p-3 rounded-xl border border-zinc-900 bg-zinc-950 hover:border-zinc-800 hover:bg-zinc-900 group transition-all duration-150 gap-2 relative overflow-hidden"
                       >
                         {isDeleteConfirming ? (
                           <div className="flex flex-col gap-2 p-1 text-center justify-center items-center w-full animate-fade-in">
@@ -487,9 +498,9 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
                           </div>
                         ) : (
                           <div className="flex items-start justify-between">
-                            <div className="min-w-0 pr-2">
+                            <div className="min-w-0 flex-1 pr-2">
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                <p className="text-xs font-bold text-zinc-200 truncate capitalize max-w-[110px] min-[370px]:max-w-[150px] md:max-w-[180px]" title={item.name}>
+                                <p className="text-xs font-bold text-zinc-200 truncate capitalize" title={item.name}>
                                   {item.name}
                                 </p>
                                 {item.isOffline && (
@@ -498,13 +509,13 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
                                   </span>
                                 )}
                                 {item.isOfflineUpdated && (
-                                  <span className="text-[9px] bg-zinc-900 text-zinc-450 border border-zinc-800 px-1.5 py-0.5 rounded font-mono uppercase font-bold animate-pulse">
+                                  <span className="text-[9px] bg-zinc-900 text-zinc-400 border border-zinc-800 px-1.5 py-0.5 rounded font-mono uppercase font-bold animate-pulse">
                                     Sync Pending
                                   </span>
                                 )}
                               </div>
                               
-                              <p className="text-[10px] text-zinc-455 font-bold truncate mt-1">
+                              <p className="text-[10px] text-zinc-400 font-bold truncate mt-1">
                                 {item.quantity} {item.unit}
                               </p>
 
@@ -514,21 +525,21 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
                             </div>
                             
                             <div className="flex items-center gap-1.5 shrink-0">
-                              <span className="text-xs font-bold text-white bg-zinc-900 border border-zinc-850 px-2 py-0.5 rounded font-mono">
+                              <span className="text-xs font-bold text-white bg-zinc-900 border border-zinc-800 px-2 py-0.5 rounded font-mono">
                                 +{item.calories} kcal
                               </span>
                               
                               <div className="flex items-center gap-1 lg:opacity-0 lg:group-hover:opacity-100 transition-all duration-150">
                                 <button
                                   onClick={() => setActiveEditEntry(item)}
-                                  className="p-1.5 text-zinc-550 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors duration-150"
+                                  className="p-1.5 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors duration-150"
                                   title="Edit food item"
                                 >
                                   <Edit2 className="w-3.5 h-3.5" />
                                 </button>
                                 <button
                                   onClick={() => setDeleteConfirmId(item.id)}
-                                  className="p-1.5 text-zinc-550 hover:text-red-400 hover:bg-zinc-800 rounded-lg transition-colors duration-150"
+                                  className="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-zinc-800 rounded-lg transition-colors duration-150"
                                   title="Delete food item"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />

@@ -95,7 +95,7 @@ export default function Signup({ onShowLogin }: SignupProps) {
                 placeholder="name@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-zinc-850 bg-zinc-900 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-700 transition duration-200"
+                className="w-full px-4 py-3 rounded-xl border border-zinc-800 bg-zinc-900 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-700 transition duration-200"
                 required
               />
             </div>
@@ -107,7 +107,7 @@ export default function Signup({ onShowLogin }: SignupProps) {
                 placeholder="Minimum 6 characters"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-zinc-850 bg-zinc-900 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-700 transition duration-200"
+                className="w-full px-4 py-3 rounded-xl border border-zinc-800 bg-zinc-900 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-700 transition duration-200"
                 required
               />
             </div>
@@ -119,7 +119,7 @@ export default function Signup({ onShowLogin }: SignupProps) {
                 placeholder="Repeat password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-zinc-850 bg-zinc-900 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-700 transition duration-200"
+                className="w-full px-4 py-3 rounded-xl border border-zinc-800 bg-zinc-900 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-700 transition duration-200"
                 required
               />
             </div>

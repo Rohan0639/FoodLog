@@ -80,9 +80,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
 
         {/* Parsed Food Receipt (if any) */}
         {!message.isTyping && message.parsedFoods && message.parsedFoods.length > 0 && (
-          <div className="w-full mt-2 rounded-xl bg-zinc-950 border border-zinc-850 p-2.5 sm:p-3.5 space-y-3 shadow-inner animate-fade-in">
+          <div className="w-full mt-2 rounded-xl bg-zinc-950 border border-zinc-800 p-2.5 sm:p-3.5 space-y-3 shadow-inner animate-fade-in">
             {/* Header info */}
-            <div className="flex items-center justify-between pb-2 border-b border-zinc-850">
+            <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
               <span className="text-xs font-bold text-zinc-300 tracking-wide uppercase flex items-center gap-1.5">
                 <Apple className="w-3.5 h-3.5 text-white" />
                 Parsed Food Logs
@@ -105,7 +105,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
                     <span className="font-bold text-white shrink-0">{food.calories} kcal</span>
                   </div>
                   {/* Macros line */}
-                  <div className="flex gap-3 text-[10px] text-zinc-450 pl-4 font-medium">
+                  <div className="flex gap-3 text-[10px] text-zinc-400 pl-4 font-medium">
                     <span>Protein: <strong className="text-zinc-300 font-semibold">{food.protein}g</strong></span>
                     <span>Carbs: <strong className="text-zinc-300 font-semibold">{food.carbs}g</strong></span>
                     <span>Fat: <strong className="text-zinc-300 font-semibold">{food.fats}g</strong></span>
@@ -117,7 +117,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
         )}
 
         {/* Timestamp */}
-        <span className="text-[10px] text-zinc-550 mt-1 px-1 font-mono uppercase">
+        <span className="text-[10px] text-zinc-500 mt-1 px-1 font-mono uppercase">
           {formatTime(message.timestamp)}
         </span>
       </div>
