@@ -16,7 +16,7 @@ A premium, serverless, monochromatic web application designed to track your nutr
 - **📊 Rich Analytics & Tracker Log**:
   - **Today's Log**: Tracks daily target goals (2000 kcal, 135g protein, 230g carbs, 70g fat) with sleek progress bars and real-time calorie counts.
   - **History & Stats**: A calendar view showing logged days, a visual 7-day calorie chart, weekly averages, and active logging streaks.
-- **🔳 Minimalist Monochromatic UI**: A high-contrast, state-of-the-art dark theme designed with Tailwind CSS, featuring smooth transitions, loaders, and a confetti blast upon successful logs.
+
 
 ---
 
