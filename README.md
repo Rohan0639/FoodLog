@@ -1,4 +1,4 @@
-# 🍳 FoodLog AI Assistant
+# 🍳 FoodLog
 
 A premium, serverless, monochromatic web application designed to track your nutrition naturally through conversational AI, built with React 19, Vite, Tailwind CSS, Supabase, and Gemini AI.
 
