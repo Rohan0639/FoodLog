@@ -1,39 +1,120 @@
-# FoodLog AI Assistant
+# 🍳 FoodLog AI Assistant
 
-A full-stack, monochromatic web application designed to log your daily meals and track your nutrition naturally through chat.
+A premium, serverless, monochromatic web application designed to track your nutrition naturally through conversational AI, built with React 19, Vite, Tailwind CSS, Supabase, and Gemini AI.
 
-## Features
-- **Gemini Nutrition Intelligence**: Powered entirely by Gemini 2.5 Flash. Bypasses intermediate parsing steps and fetches food details, quantities, and macronutrients (calories, protein, carbs, fat) in a single LLM request.
-- **SQLite Database Ledger**: Automatically records all transaction requests, including raw user messages, stringified Gemini JSON payloads, and timestamps, inside a local SQLite database (using Node's native `node:sqlite`).
-- **Monochromatic UI**: Sleek, high-contrast black-and-white theme featuring progress bars and macro tracking.
-- **Offline Fallback**: Automatically switches to local mock parsing logic if the backend server is offline, supporting offline-first logging with auto-calculated metrics.
-- **Greeting & Clear Triggers**: Handles conversation starters (e.g. "hi", "hello") gracefully, and processes text shortcuts like "clear" or "reset" to clear the logged meal ledger.
+---
 
-## Setup & Running Locally
+## ✨ Features
 
-1. **Install all dependencies**:
-   ```bash
-   npm run install:all
-   ```
+- **🧠 Gemini 3.1 Flash Lite Parser**: Send natural language commands (e.g., *"I had 3 eggs, a bowl of oatmeal, and a glass of orange juice for breakfast"*) and get them parsed into detailed individual food items with exact macronutrients (calories, protein, carbs, fats) instantly.
+- **🔐 Supabase Serverless Backend**: Comprehensive user authentication (Sign Up / Log In) and cloud data persistence using Supabase's secure API Client and Row-Level Security (RLS).
+- **⚡ Interactive Verification**: A verification panel that displays parsed items, allowing you to edit quantities, scale portions, change units, and verify calculations before confirming them to your ledger.
+- **📡 Offline-First Mode & Background Sync**:
+  - Automatically handles network outages.
+  - Queues additions, edits, and deletions in a local sync pipeline.
+  - Automatically executes pending synchronization when returning online, passing raw descriptions to Gemini for parsing and updating the remote database.
+- **📊 Rich Analytics & Tracker Log**:
+  - **Today's Log**: Tracks daily target goals (2000 kcal, 135g protein, 230g carbs, 70g fat) with sleek progress bars and real-time calorie counts.
+  - **History & Stats**: A calendar view showing logged days, a visual 7-day calorie chart, weekly averages, and active logging streaks.
+- **🔳 Minimalist Monochromatic UI**: A high-contrast, state-of-the-art dark theme designed with Tailwind CSS, featuring smooth transitions, loaders, and a confetti blast upon successful logs.
 
-2. **Configure environment variables**:
-   Create a `.env` file inside the `backend/` directory with:
-   ```env
-   PORT=5000
-   GEMINI_API_KEY=your_gemini_api_key
-   ```
-   *(Note: Spoonacular API keys are no longer needed).*
+---
 
-3. **Start both frontend and backend concurrently**:
-   ```bash
-   npm run dev
-   ```
-   Open [http://localhost:5173](http://localhost:5173) in your browser.
+## 🛠️ Architecture & Tech Stack
 
-## Deployment
-using verccel to deploy the project
+- **Frontend**: [React 19](https://react.dev/), [Vite](https://vite.dev/), [TypeScript](https://www.typescriptlang.org/), [Tailwind CSS](https://tailwindcss.com/)
+- **Database & Auth**: [Supabase](https://supabase.com/) (`@supabase/supabase-js`)
+- **AI Integration**: Client-side integration with [Google Gemini API](https://ai.google.dev/) (utilizing `gemini-3.1-flash-lite` for high speed and low latency)
+- **Icons & Effects**: [Lucide React](https://lucide.dev/), [Canvas Confetti](https://www.npmjs.com/package/canvas-confetti)
 
-Deploy the project as two separate applications on Vercel:
-- **Backend**: Set the root directory to `backend/` and configure `GEMINI_API_KEY` in env variables. Database storage will seamlessly fallback to write to Vercel's ephemeral `/tmp` directory.
-- **Frontend**: Set the root directory to `frontend/` and configure the environment variable `VITE_API_URL` to point to your deployed backend.
+---
 
+## 📂 Project Structure
+
+```
+foodlog/
+├── frontend/               # React Vite frontend application
+│   ├── src/
+│   │   ├── auth/          # Login & Signup authentication screens
+│   │   ├── components/    # Reusable components (Navbar, Calendar, DayLog, Charts, etc.)
+│   │   ├── lib/           # Supabase client initializer
+│   │   ├── pages/         # Dashboard / Core Workspace
+│   │   ├── utils/         # Gemini Client Parser & Unit conversion utilities
+│   │   ├── types.ts       # TypeScript type specifications
+│   │   └── main.tsx       # Vite entry point
+│   ├── tailwind.config.js # Custom monochromatic styling configuration
+│   └── package.json       # Dependencies & Scripts
+├── vercel.json             # Vercel deployment instructions
+└── package.json           # Workspace root scripts
+```
+
+---
+
+## ⚙️ Setup & Running Locally
+
+### 1. Prerequisites
+Ensure you have [Node.js](https://nodejs.org/) installed (v18+ recommended).
+
+### 2. Clone the Repository
+```bash
+git clone https://github.com/Rohan0639/FoodLog.git
+cd FoodLog
+```
+
+### 3. Install Dependencies
+Install packages for the frontend workspace using the root helper script:
+```bash
+npm run install:all
+```
+
+### 4. Environment Variables
+Create a `.env` file inside the `frontend/` directory:
+```env
+VITE_SUPABASE_URL=https://your-supabase-project.supabase.co
+VITE_SUPABASE_KEY=your-supabase-anon-key
+VITE_GEMINI_API_KEY=your-gemini-api-key
+```
+
+> **Note**: You can obtain a free Gemini API key from [Google AI Studio](https://aistudio.google.com/).
+
+### 5. Supabase Table Schema
+To support the database schema, make sure your Supabase instance has a table named `food_logs` with the following columns:
+
+| Column Name | Data Type | Default / Settings |
+|-------------|-----------|--------------------|
+| `id`        | `uuid`    | Primary Key, `gen_random_uuid()` |
+| `user_id`   | `uuid`    | Foreign Key to `auth.users.id` |
+| `name`      | `text`    | - |
+| `quantity`  | `numeric` | - |
+| `unit`      | `text`    | - |
+| `calories`  | `integer` | - |
+| `protein`   | `numeric` | - |
+| `carbs`     | `numeric` | - |
+| `fats`      | `numeric` | - |
+| `date`      | `date`    | - |
+| `created_at`| `timestamptz` | `now()` |
+
+Enable Row-Level Security (RLS) on `food_logs` with policies allowing users to read, insert, update, and delete only their own records based on `auth.uid() = user_id`.
+
+### 6. Run the Application
+Start the development server:
+```bash
+npm run dev
+```
+Open [http://localhost:5173](http://localhost:5173) in your browser.
+
+---
+
+## 🚀 Deployment
+
+The project is preconfigured to deploy to [Vercel](https://vercel.com/) with a root `vercel.json` file pointing to the frontend build:
+
+```json
+{
+  "buildCommand": "npm run build --prefix frontend",
+  "installCommand": "npm install --prefix frontend",
+  "outputDirectory": "frontend/dist"
+}
+```
+
+Simply connect this repository to your Vercel account, set the root directory to project root, and configure the Environment Variables (`VITE_SUPABASE_URL`, `VITE_SUPABASE_KEY`, and `VITE_GEMINI_API_KEY`) in your Vercel project settings.
