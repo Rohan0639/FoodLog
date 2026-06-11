@@ -55,7 +55,7 @@ export default function Navbar({
 
         <button
           onClick={onLogout}
-          className="p-2 rounded-xl border border-zinc-850 bg-zinc-900/80 text-zinc-400 hover:text-white hover:border-zinc-750 flex items-center gap-1.5 shadow-sm active:scale-95 transition-all duration-150 text-xs font-semibold"
+          className="p-2 rounded-xl border border-zinc-800 bg-zinc-900/80 text-zinc-400 hover:text-white hover:border-zinc-700 flex items-center gap-1.5 shadow-sm active:scale-95 transition-all duration-150 text-xs font-semibold"
           title="Sign Out"
         >
           <LogOut className="w-4 h-4" />
@@ -65,9 +65,9 @@ export default function Navbar({
         {/* Collapsible Mobile Dashboard Trigger */}
         <button
           onClick={() => setIsDashboardOpenMobile(!isDashboardOpenMobile)}
-          className="lg:hidden p-2 rounded-xl border border-zinc-850 bg-zinc-900/80 text-zinc-350 hover:text-white flex items-center gap-1.5 shadow-sm active:scale-95 transition-all duration-150"
+          className="lg:hidden p-2 rounded-xl border border-zinc-800 bg-zinc-900/80 text-zinc-400 hover:text-white flex items-center gap-1.5 shadow-sm active:scale-95 transition-all duration-150"
         >
-          <BarChart2 className="w-4.5 h-4.5 text-white" />
+          <BarChart2 className="w-5 h-5 text-white" />
           <span className="text-xs font-bold hidden min-[370px]:inline">Stats</span>
           {hasLogs && (
             <span className="w-2 h-2 rounded-full bg-white shrink-0" />

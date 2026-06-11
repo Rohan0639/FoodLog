@@ -71,10 +71,10 @@ export const HistoryStatsView: React.FC<HistoryStatsViewProps> = ({
       {/* SVG Calorie Graph Card */}
       <div className="p-3 sm:p-4 bg-zinc-950 border border-zinc-900 rounded-2xl space-y-3.5 shadow-inner">
         <div className="flex justify-between items-center px-1">
-          <span className="text-[10px] font-black text-zinc-550 uppercase tracking-wider font-mono">
+          <span className="text-[10px] font-black text-zinc-500 uppercase tracking-wider font-mono">
             Calorie Intake (Last 7 Days)
           </span>
-          <span className="text-[9px] font-bold bg-zinc-900 text-zinc-400 px-2 py-0.5 rounded-full border border-zinc-850">
+          <span className="text-[9px] font-bold bg-zinc-900 text-zinc-400 px-2 py-0.5 rounded-full border border-zinc-800">
             Past Week
           </span>
         </div>
@@ -82,7 +82,7 @@ export const HistoryStatsView: React.FC<HistoryStatsViewProps> = ({
         {/* SVG Graph rendering */}
         <div className="relative pt-2">
           {graphData.length === 0 ? (
-            <div className="h-[100px] flex items-center justify-center text-zinc-550 text-xs font-mono">
+            <div className="h-[100px] flex items-center justify-center text-zinc-500 text-xs font-mono">
               No stats available
             </div>
           ) : (

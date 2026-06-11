@@ -35,7 +35,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ onSelectSuggestion }) =>
 
       {/* Suggested prompts */}
       <div className="w-full space-y-3">
-        <div className="flex items-center gap-2 text-[10px] sm:text-xs font-semibold text-zinc-450 uppercase tracking-wider mb-1 px-1 justify-start">
+        <div className="flex items-center gap-2 text-[10px] sm:text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-1 px-1 justify-start">
           <MessageSquarePlus className="w-3.5 h-3.5 text-zinc-400" />
           <span>Quick Log Examples</span>
         </div>

@@ -45,7 +45,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled = 
       onSubmit={handleSubmit}
       className="p-4 bg-black border-t border-zinc-900 flex gap-2 items-end max-w-2xl mx-auto w-full"
     >
-      <div className="relative flex-1 flex items-center bg-zinc-950 border border-zinc-850 rounded-2xl focus-within:border-white focus-within:ring-2 focus-within:ring-white/10 transition-all duration-200">
+      <div className="relative flex-1 flex items-center bg-zinc-950 border border-zinc-800 rounded-2xl focus-within:border-white focus-within:ring-2 focus-within:ring-white/10 transition-all duration-200">
         <textarea
           ref={textareaRef}
           value={inputText}
@@ -66,7 +66,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled = 
               : 'text-zinc-600 cursor-not-allowed bg-transparent scale-90'
           }`}
         >
-          <SendHorizontal className="w-4.5 h-4.5" />
+          <SendHorizontal className="w-5 h-5" />
         </button>
       </div>
     </form>
