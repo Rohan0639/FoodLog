@@ -28,6 +28,7 @@ export const parseLocalDateString = (timestamp: string): string => {
     const d = new Date(timestamp);
     if (!isNaN(d.getTime())) {
       return getLocalIsoDate(d);
+    }
   } catch {
     // Fallback to raw parsing
   }
