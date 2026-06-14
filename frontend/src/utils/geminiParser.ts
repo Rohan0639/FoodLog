@@ -43,7 +43,7 @@ function extractWeightInGramsOrMl(quantityStr: string) {
   return null;
 }
 
-export function validateGeminiResponse(data: any) {
+function validateGeminiResponse(data: any) {
   if (!data || typeof data !== 'object') {
     throw new Error("Invalid structure: response data is not an object");
   }
@@ -132,7 +132,10 @@ export function validateGeminiResponse(data: any) {
   }
 }
 
-export function normalizeFoodInput(text: string): string {
+/**
+ * Port of Input Normalization Helper
+ */
+function normalizeFoodInput(text: string): string {
   if (!text) return "";
   return text
     .replace(/\bgms\b/gi, 'grams')
@@ -142,4 +145,118 @@ export function normalizeFoodInput(text: string): string {
     .replace(/\bl\b/gi, 'liters');
 }
 
+/**
+ * Queries Gemini API directly from the client and parses the nutrition data.
+ */
+export async function analyzeFoodClient(foodText: string): Promise<GeminiResponse> {
+  const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+  if (!GEMINI_API_KEY) {
+    throw new Error('Missing Gemini API Key! Please verify that VITE_GEMINI_API_KEY is configured in your .env file.');
+  }
 
+  const normalizedInput = normalizeFoodInput(foodText);
+
+  const prompt = `You are a strict food recognition and calorie estimation assistant.
+
+Step 1: Validate the input.
+- Check if the user input describes real, edible food or drink.
+- If the input is not food (e.g., objects, people, jokes, unrealistic items like "my friend", "stone", "car", etc.), DO NOT estimate calories.
+
+Step 2: If invalid:
+- Respond ONLY with:
+{
+  "status": "invalid",
+  "reason": "Input is not a valid food item"
+}
+
+Step 3: If valid:
+- Extract food items and estimate realistic calorie values.
+- Avoid extreme or unrealistic calorie values.
+
+Respond ONLY in JSON format.
+
+Valid response format:
+{
+  "status": "valid",
+  "reply": "A friendly confirmation or response message summarizing the food and macros, and maybe a helpful tip.",
+  "items": [
+    {
+      "name": "food name",
+      "quantity": "string quantity description (e.g. 1 apple, 100g, etc.)",
+      "calories": number,
+      "protein": number,
+      "carbs": number,
+      "fat": number
+    }
+  ],
+  "totals": {
+    "calories": number,
+    "protein": number,
+    "carbs": number,
+    "fat": number
+  }
+}
+
+Use realistic values for macros and calories:
+- Max calories per gram ≤ 9 kcal
+- Ensure macros match calories:
+  calories ≈ (protein×4 + carbs×4 + fat×9)
+
+No explanation. Only JSON.
+
+Sentence to analyze: "${normalizedInput.replace(/"/g, '\\"')}"`;
+
+  const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      contents: [
+        {
+          parts: [
+            {
+              text: prompt
+            }
+          ]
+        }
+      ],
+      generationConfig: {
+        responseMimeType: 'application/json'
+      }
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`Gemini API returned status: ${response.status}`);
+  }
+
+  const resData = await response.json();
+  const candidates = resData?.candidates;
+  if (!candidates || candidates.length === 0) {
+    throw new Error('Gemini API did not return any candidates.');
+  }
+
+  const rawText = candidates[0].content?.parts[0]?.text;
+  
+  let parsedData: any;
+  try {
+    const text = (rawText || '').trim();
+    const firstBrace = text.indexOf('{');
+    const lastBrace = text.lastIndexOf('}');
+    
+    if (firstBrace === -1 || lastBrace === -1 || lastBrace < firstBrace) {
+      throw new SyntaxError("Could not find valid JSON object markers in response text");
+    }
+    
+    const jsonSubstring = text.substring(firstBrace, lastBrace + 1);
+    parsedData = JSON.parse(jsonSubstring);
+  } catch (parseErr: any) {
+    throw new SyntaxError(`JSON Parsing failed: ${parseErr.message}`);
+  }
+
+  // Validate format requirements
+  validateGeminiResponse(parsedData);
+
+  return parsedData as GeminiResponse;
+}

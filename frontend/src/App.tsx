@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { supabase } from './config/supabase';
-import Login from './pages/Login';
-import Signup from './pages/Signup';
+import { supabase } from './lib/supabase';
+import Login from './auth/Login';
+import Signup from './auth/Signup';
 import Dashboard from './pages/Dashboard';
 import type { User } from '@supabase/supabase-js';
 import { Loader2 } from 'lucide-react';

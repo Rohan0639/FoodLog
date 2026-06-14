@@ -1,4 +1,4 @@
-import { supabase } from '../../config/supabase';
+import { supabase } from '../lib/supabase';
 
 /**
  * Verification test function to check Supabase database connectivity.

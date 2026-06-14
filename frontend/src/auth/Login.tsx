@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { supabase } from '../config/supabase';
+import { supabase } from '../lib/supabase';
 import { Apple, Loader2, AlertCircle } from 'lucide-react';
 
 interface LoginProps {

@@ -96,12 +96,3 @@ export interface DailyGoal {
   fat: number;
 }
 
-export interface GeminiResponse {
-  status: 'valid' | 'invalid';
-  reason?: string;
-  reply?: string;
-  items?: ParsedItem[];
-  totals?: ParsedTotals;
-}
-
-
