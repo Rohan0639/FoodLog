@@ -2,8 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import type { Message, DailyGoal, OfflineAction, FoodEntry } from '../types';
 import { convertUnit } from '../utils/unitConverter';
 import confetti from 'canvas-confetti';
-import { supabase } from '../lib/supabase';
-import { analyzeFoodClient } from '../utils/geminiParser';
+import { foodLogService } from '../services/foodLogService';
+import { analyzeFood } from '../utils/geminiProxy';
 import Navbar from '../components/Navbar';
 import FoodLogger from '../components/FoodLogger';
 import { NutritionDashboard } from '../components/NutritionDashboard';
@@ -149,7 +149,7 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
     setIsBotTyping(true);
 
     try {
-      const parseData = await analyzeFoodClient(text);
+      const parseData = await analyzeFood(text);
       if (parseData.status === 'invalid') {
         const botMsg: Message = {
           id: generateMessageId('bot'),
@@ -197,7 +197,18 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
         setActiveFoods(newEntries);
       }
     } catch (error) {
-      const err = error as Error;
+      const err = error as any;
+      if (err.name === 'RateLimitError') {
+        const botMsg: Message = {
+          id: generateMessageId('bot-rate-limit'),
+          sender: 'bot',
+          text: "⚠️ Slow down! Rate limit exceeded. Please wait a bit before logging more foods.",
+          timestamp: getCurrentDate(),
+        };
+        setMessages((prev) => [...prev, botMsg]);
+        setIsBotTyping(false);
+        return;
+      }
       console.warn('Failed to analyze food. Saving raw input locally...', err);
       
       const tempId = generateTempId();
@@ -299,14 +310,7 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
         user_id: user.id // Automatically attach user_id
       }));
 
-      const { data: savedEntries, error } = await supabase
-        .from('food_logs')
-        .insert(dbFoods)
-        .select();
-
-      if (error) {
-        throw new Error(`Supabase batch save error: ${error.message}`);
-      }
+      const savedEntries = await foodLogService.insertFoodLogs(dbFoods);
 
       const mappedSaved = (savedEntries || []).map((item: any) => ({
         id: item.id,
