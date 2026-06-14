@@ -2,6 +2,19 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent';
 
+interface CacheEntry {
+  response: any;
+  expiresAt: number;
+}
+
+// Global serverless function memory cache (persists across warm invocations)
+const cache = new Map<string, CacheEntry>();
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+function getNormalizedCacheKey(text: string): string {
+  return text.toLowerCase().trim().replace(/\s+/g, ' ');
+}
+
 function normalizeFoodInput(text: string): string {
   if (!text) return "";
   return text
@@ -27,6 +40,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!GEMINI_API_KEY) {
     return res.status(500).json({ error: 'GEMINI_API_KEY is not configured on the server' });
   }
+
+  const cacheKey = getNormalizedCacheKey(text);
+
+  // Safe read from cache (Step 4: Fail-Safe Design)
+  try {
+    const cachedEntry = cache.get(cacheKey);
+    if (cachedEntry) {
+      if (Date.now() < cachedEntry.expiresAt) {
+        console.log(`[Server Cache] Hit for key: "${cacheKey}"`);
+        return res.status(200).json(cachedEntry.response);
+      } else {
+        cache.delete(cacheKey); // Clean up expired entry
+      }
+    }
+  } catch (cacheReadError) {
+    console.error('[Server Cache] Error reading cache:', cacheReadError);
+  }
+
+  console.log(`[Server Cache] Miss for key: "${cacheKey}"`);
 
   const normalizedInput = normalizeFoodInput(text);
 
@@ -131,6 +163,24 @@ Sentence to analyze: "${normalizedInput.replace(/"/g, '\\"')}"`;
     
     const jsonSubstring = cleanText.substring(firstBrace, lastBrace + 1);
     const parsedData = JSON.parse(jsonSubstring);
+
+    // Safe write to cache (Step 4: Fail-Safe Design)
+    try {
+      const now = Date.now();
+      // Keep cache size bounded by evicting expired entries on write
+      for (const [k, v] of cache.entries()) {
+        if (now > v.expiresAt) {
+          cache.delete(k);
+        }
+      }
+      cache.set(cacheKey, {
+        response: parsedData,
+        expiresAt: now + CACHE_TTL_MS
+      });
+      console.log(`[Server Cache] Stored response for key: "${cacheKey}"`);
+    } catch (cacheWriteError) {
+      console.error('[Server Cache] Error writing cache:', cacheWriteError);
+    }
 
     return res.status(200).json(parsedData);
   } catch (error: any) {
