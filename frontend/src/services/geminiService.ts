@@ -1,7 +1,7 @@
 import { analyzeFoodClient, type GeminiResponse } from './geminiParser';
-import { globalRateLimiter, RateLimitError } from './rateLimiter';
+import { globalRateLimiter, RateLimitError } from '../middleware/rateLimiter';
 import { responseCache } from './responseCache';
-import { apiLogger } from './apiLogger';
+import { apiLogger } from '../middleware/apiLogger';
 
 /**
  * Proxy function to call the serverless API.
@@ -48,18 +48,18 @@ export async function analyzeFood(text: string): Promise<GeminiResponse> {
     }
 
     const data = await response.json();
-    
+
     // Validate the basic structure of the response
     if (!data || typeof data !== 'object') {
       throw new Error('Invalid response structure from proxy');
     }
-    
+
     // Cache the successful response
     responseCache.set(text, data);
-    
+
     const duration = Date.now() - startTime;
     apiLogger.info(`Successfully parsed via proxy in ${duration}ms:`, data);
-    
+
     return data as GeminiResponse;
   } catch (error: any) {
     clearTimeout(timeoutId);
@@ -67,16 +67,16 @@ export async function analyzeFood(text: string): Promise<GeminiResponse> {
       throw error;
     }
     apiLogger.warn(`[Proxy] Failed to query proxy, falling back to direct client-side call. Reason: ${error.message}`);
-    
+
     // Fallback to direct client call using client-side API key
     const fallbackData = await analyzeFoodClient(text);
-    
+
     // Cache the fallback response if successful
     responseCache.set(text, fallbackData);
-    
+
     const duration = Date.now() - startTime;
     apiLogger.info(`Successfully parsed via direct client fallback in ${duration}ms:`, fallbackData);
-    
+
     return fallbackData;
   }
 }

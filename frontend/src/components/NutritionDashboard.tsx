@@ -1,18 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import type { FoodEntry, DailyGoal } from '../types';
-
-const getLocalIsoDate = (d: Date = new Date()): string => {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
+import { getLocalIsoDate } from '../utils/dateUtils';
 import { EditFoodModal } from './EditFoodModal';
 import { CalendarView } from './CalendarView';
 import { HistoryStatsView } from './HistoryStatsView';
 import { DayLogView } from './DayLogView';
 import { Flame, Trash2, Edit2, Calendar, Target, RefreshCw, BarChart2, AlertTriangle, History, X } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../config/supabase';
 
 interface NutritionDashboardProps {
   logs: FoodEntry[];
@@ -72,7 +66,7 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
     try {
       const year = parseInt(month.split('-')[0]);
       const monthNum = parseInt(month.split('-')[1]);
-      
+
       const startDate = `${month}-01`;
       const nextMonth = monthNum === 12 ? 1 : monthNum + 1;
       const nextYear = monthNum === 12 ? year + 1 : year;
@@ -331,21 +325,19 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
       <div className="px-3 sm:px-4 py-2 border-b border-zinc-900 flex gap-2 bg-black/50 shrink-0">
         <button
           onClick={() => setActiveTab('today')}
-          className={`flex-1 py-1.5 rounded-xl text-xs font-bold transition-all duration-150 ${
-            activeTab === 'today'
-              ? 'bg-zinc-900 text-white border border-zinc-800'
-              : 'text-zinc-500 hover:text-zinc-300'
-          }`}
+          className={`flex-1 py-1.5 rounded-xl text-xs font-bold transition-all duration-150 ${activeTab === 'today'
+            ? 'bg-zinc-900 text-white border border-zinc-800'
+            : 'text-zinc-500 hover:text-zinc-300'
+            }`}
         >
           Today's Log
         </button>
         <button
           onClick={() => setActiveTab('history')}
-          className={`flex-1 py-1.5 rounded-xl text-xs font-bold transition-all duration-150 ${
-            activeTab === 'history'
-              ? 'bg-zinc-900 text-white border border-zinc-800'
-              : 'text-zinc-500 hover:text-zinc-300'
-          }`}
+          className={`flex-1 py-1.5 rounded-xl text-xs font-bold transition-all duration-150 ${activeTab === 'history'
+            ? 'bg-zinc-900 text-white border border-zinc-800'
+            : 'text-zinc-500 hover:text-zinc-300'
+            }`}
         >
           History & Stats
         </button>
@@ -368,7 +360,7 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
                   <span className="text-xs text-zinc-500 font-mono"> / {dailyGoal.calories} kcal</span>
                 </div>
               </div>
-              
+
               {/* Progress Bar */}
               <div className="w-full h-2.5 bg-zinc-900 rounded-full overflow-hidden mb-1 border border-zinc-800">
                 <div
@@ -387,7 +379,7 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
               <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider px-1">
                 Macronutrients
               </span>
-              
+
               <div className="space-y-3.5 bg-zinc-950 border border-zinc-800 rounded-2xl p-3 sm:p-4">
                 {/* Protein */}
                 <div>
@@ -453,7 +445,7 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
               <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider px-1">
                 Logged Foods
               </span>
-              
+
               {logs.length === 0 ? (
                 <div className="flex flex-col items-center justify-center p-8 border border-dashed border-zinc-800 rounded-2xl text-center">
                   <Target className="w-6 h-6 text-zinc-600 mb-2" />
@@ -466,7 +458,7 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
                 <div className="space-y-2">
                   {logs.map((item) => {
                     const isDeleteConfirming = deleteConfirmId === item.id;
-                    
+
                     return (
                       <div
                         key={item.id}
@@ -514,7 +506,7 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
                                   </span>
                                 )}
                               </div>
-                              
+
                               <p className="text-[10px] text-zinc-400 font-bold truncate mt-1">
                                 {item.quantity} {item.unit}
                               </p>
@@ -523,12 +515,12 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
                                 P: {item.protein}g • C: {item.carbs}g • F: {item.fats}g
                               </p>
                             </div>
-                            
+
                             <div className="flex items-center gap-1.5 shrink-0">
                               <span className="text-xs font-bold text-white bg-zinc-900 border border-zinc-800 px-2 py-0.5 rounded font-mono">
                                 +{item.calories} kcal
                               </span>
-                              
+
                               <div className="flex items-center gap-1 lg:opacity-0 lg:group-hover:opacity-100 transition-all duration-150">
                                 <button
                                   onClick={() => setActiveEditEntry(item)}

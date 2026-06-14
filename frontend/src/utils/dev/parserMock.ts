@@ -1,4 +1,4 @@
-import type { FoodItem } from '../types';
+import type { FoodItem } from '../../types';
 
 const GREETINGS = new Set([
   'hi', 'hello', 'hey', 'yo', 'greetings', 'good morning', 'good afternoon', 'good evening',

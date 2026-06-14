@@ -3,24 +3,16 @@ import type { Message, DailyGoal, OfflineAction, FoodEntry } from '../types';
 import { convertUnit } from '../utils/unitConverter';
 import confetti from 'canvas-confetti';
 import { foodLogService } from '../services/foodLogService';
-import { analyzeFood } from '../utils/geminiProxy';
+import { analyzeFood } from '../services/geminiService';
 import Navbar from '../components/Navbar';
 import FoodLogger from '../components/FoodLogger';
 import { NutritionDashboard } from '../components/NutritionDashboard';
 import type { User } from '@supabase/supabase-js';
 import { useFoodLogs } from '../hooks/useFoodLogs';
-
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const DEFAULT_DAILY_GOAL: DailyGoal = {
-  calories: 2000,
-  protein: 135,
-  carbs: 230,
-  fat: 70,
-};
+import { DEFAULT_DAILY_GOAL } from '../constants/goals';
+import { getCurrentDate, getCurrentIsoString, parseLocalDateString } from '../utils/dateUtils';
 
 // ─── Pure helpers (chat / ID generation) ─────────────────────────────────────
-// Date helpers are kept here too because handleConfirmLog still uses parseLocalDateString.
 
 const generateMessageId = (sender: string): string => {
   return `${sender}-${crypto.randomUUID()}`;
@@ -28,37 +20,6 @@ const generateMessageId = (sender: string): string => {
 
 const generateTempId = (): string => {
   return `temp-${crypto.randomUUID()}`;
-};
-
-const getCurrentDate = (): Date => {
-  return new Date();
-};
-
-const getCurrentIsoString = (): string => {
-  return new Date().toISOString();
-};
-
-const getLocalIsoDate = (d: Date = new Date()): string => {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
-const parseLocalDateString = (timestamp: string): string => {
-  if (!timestamp || typeof timestamp !== 'string') {
-    return getLocalIsoDate();
-  }
-  if (/^\d{4}-\d{2}-\d{2}$/.test(timestamp)) {
-    return timestamp;
-  }
-  try {
-    const d = new Date(timestamp);
-    if (!isNaN(d.getTime())) {
-      return getLocalIsoDate(d);
-    }
-  } catch (e) {}
-  return timestamp.split('T')[0] || getLocalIsoDate();
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
