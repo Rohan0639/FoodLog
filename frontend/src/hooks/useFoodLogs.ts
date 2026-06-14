@@ -1,31 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { foodLogService } from '../services/foodLogService';
-import { analyzeFood } from '../utils/geminiProxy';
-import { apiLogger } from '../utils/apiLogger';
+import { analyzeFood } from '../services/geminiService';
+import { apiLogger } from '../middleware/apiLogger';
 import type { FoodEntry, OfflineAction } from '../types';
-
-// ─── Pure date helpers (self-contained so the hook has no outside deps) ───────
-
-const getLocalIsoDate = (d: Date = new Date()): string => {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
-const parseLocalDateString = (timestamp: string): string => {
-  if (!timestamp || typeof timestamp !== 'string') return getLocalIsoDate();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(timestamp)) return timestamp;
-  try {
-    const d = new Date(timestamp);
-    if (!isNaN(d.getTime())) return getLocalIsoDate(d);
-  } catch (e) {}
-  return timestamp.split('T')[0] || getLocalIsoDate();
-};
+import { getLocalIsoDate, parseLocalDateString, getCurrentIsoString } from '../utils/dateUtils';
 
 const getTodayDate = (): string => getLocalIsoDate();
-const getCurrentIsoString = (): string => new Date().toISOString();
 
 // ─── Shared DB row → FoodEntry mapper ─────────────────────────────────────────
 
