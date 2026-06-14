@@ -3,7 +3,7 @@
  * Prepends [FoodLog] prefix, timestamps, and automatically suppresses info level logs in production.
  */
 
-const isProd = import.meta.env.PROD;
+const isProd = process.env.NODE_ENV === 'production';
 
 export const apiLogger = {
   /**

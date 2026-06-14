@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { foodLogService } from '../services/foodLogService';
 import { analyzeFood } from '../services/geminiService';
-import { apiLogger } from '../middleware/apiLogger';
+import { clientLogger as apiLogger } from '../utils/clientLogger';
 import type { FoodEntry, OfflineAction } from '../types';
 import { getLocalIsoDate, parseLocalDateString, getCurrentIsoString } from '../utils/dateUtils';
 
