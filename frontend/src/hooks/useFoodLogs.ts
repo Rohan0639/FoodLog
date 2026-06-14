@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import type { User } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
-import { analyzeFoodClient } from '../utils/geminiParser';
+import { foodLogService } from '../services/foodLogService';
+import { analyzeFood } from '../utils/geminiProxy';
+import { apiLogger } from '../utils/apiLogger';
 import type { FoodEntry, OfflineAction } from '../types';
 
 // ─── Pure date helpers (self-contained so the hook has no outside deps) ───────
@@ -79,21 +80,13 @@ export function useFoodLogs(
     const checkConnectionAndLoadLogs = async () => {
       try {
         const todayStr = getTodayDate();
-        // Relying on RLS: We select * and do not manually filter by user_id
-        const { data, error } = await supabase
-          .from('food_logs')
-          .select('*')
-          .eq('date', todayStr)
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
-
-        const mappedData = (data || []).map(mapRow);
+        const data = await foodLogService.fetchTodayLogs(todayStr);
+        const mappedData = data.map(mapRow);
         setIsOnline(true);
         setLogs(mappedData);
         localStorage.setItem(`food_logs_local_${user.id}`, JSON.stringify(mappedData));
       } catch (err) {
-        console.warn('Unable to fetch logs from Supabase. Falling back to local cache.', err);
+        apiLogger.warn('Unable to fetch logs from Supabase. Falling back to local cache.', err);
         setIsOnline(false);
         const cached = localStorage.getItem(`food_logs_local_${user.id}`);
         if (cached) {
@@ -106,7 +99,7 @@ export function useFoodLogs(
             });
             setLogs(filtered);
           } catch (e) {
-            console.error('Failed to parse cached logs', e);
+            apiLogger.error('Failed to parse cached logs', e);
           }
         }
       }
@@ -128,20 +121,13 @@ export function useFoodLogs(
 
       if (isOnline) {
         try {
-          const { data, error } = await supabase
-            .from('food_logs')
-            .select('*')
-            .eq('date', todayStr)
-            .order('created_at', { ascending: false });
-
-          if (!error && data) {
-            const mappedData = data.map(mapRow);
-            setLogs(mappedData);
-            localStorage.setItem(`food_logs_local_${user.id}`, JSON.stringify(mappedData));
-            return;
-          }
+          const data = await foodLogService.fetchTodayLogs(todayStr);
+          const mappedData = data.map(mapRow);
+          setLogs(mappedData);
+          localStorage.setItem(`food_logs_local_${user.id}`, JSON.stringify(mappedData));
+          return;
         } catch (err) {
-          console.warn('[Timer] Failed to fetch new logs from Supabase after midnight:', err);
+          apiLogger.warn('[Timer] Failed to fetch new logs from Supabase after midnight:', err);
         }
       }
 
@@ -181,19 +167,19 @@ export function useFoodLogs(
     try {
       actions = JSON.parse(actionsJson);
     } catch (e) {
-      console.error('Failed to parse offline actions', e);
+      apiLogger.error('Failed to parse offline actions', e);
       return;
     }
 
     if (actions.length === 0) return;
 
-    console.log(`[Sync] Starting sync of ${actions.length} offline actions...`);
+    apiLogger.info(`[Sync] Starting sync of ${actions.length} offline actions...`);
     const remainingActions: OfflineAction[] = [...actions];
 
     for (const action of actions) {
       try {
         if (action.type === 'ADD') {
-          const parseData = await analyzeFoodClient(action.text!);
+          const parseData = await analyzeFood(action.text!);
           if (parseData.status === 'invalid') {
             setLogs((prev) => prev.filter((item) => item.id !== action.tempId));
             remainingActions.shift();
@@ -219,8 +205,8 @@ export function useFoodLogs(
             };
           });
 
-          const { error } = await supabase.from('food_logs').insert(entriesToSave);
-          if (!error) {
+          try {
+            await foodLogService.insertFoodLogs(entriesToSave);
             const localEntries = entriesToSave.map((item) => ({
               id: item.id,
               name: item.name,
@@ -242,42 +228,29 @@ export function useFoodLogs(
               return [...localEntries, ...prev];
             });
             remainingActions.shift();
-          } else {
+          } catch (insertErr) {
+            apiLogger.error('Failed to sync offline ADD action:', insertErr);
             break;
           }
         } else if (action.type === 'EDIT' && action.entry) {
-          const { error } = await supabase
-            .from('food_logs')
-            .update({
-              name: action.entry.name,
-              quantity: action.entry.quantity,
-              unit: action.entry.unit,
-              calories: action.entry.calories,
-              protein: action.entry.protein,
-              carbs: action.entry.carbs,
-              fats: action.entry.fats,
-            })
-            .eq('id', action.id);
-
-          if (!error) {
+          try {
+            await foodLogService.updateFoodLog(action.id!, action.entry);
             remainingActions.shift();
-          } else {
+          } catch (editErr) {
+            apiLogger.error('Failed to sync offline EDIT action:', editErr);
             break;
           }
         } else if (action.type === 'DELETE') {
-          const { error } = await supabase
-            .from('food_logs')
-            .delete()
-            .eq('id', action.id);
-
-          if (!error) {
+          try {
+            await foodLogService.deleteFoodLog(action.id!);
             remainingActions.shift();
-          } else {
+          } catch (delErr) {
+            apiLogger.error('Failed to sync offline DELETE action:', delErr);
             break;
           }
         }
       } catch (err) {
-        console.error('Failed to sync action:', action, err);
+        apiLogger.error('Failed to sync action:', action, err);
         break;
       }
     }
@@ -285,22 +258,15 @@ export function useFoodLogs(
     localStorage.setItem(`offline_pending_actions_${user.id}`, JSON.stringify(remainingActions));
 
     if (remainingActions.length === 0) {
-      console.log('[Sync] All offline actions synced successfully.');
+      apiLogger.info('[Sync] All offline actions synced successfully.');
       try {
         const todayStr = getTodayDate();
-        const { data, error } = await supabase
-          .from('food_logs')
-          .select('*')
-          .eq('date', todayStr)
-          .order('created_at', { ascending: false });
-
-        if (!error && data) {
-          const mappedData = data.map(mapRow);
-          setLogs(mappedData);
-          localStorage.setItem(`food_logs_local_${user.id}`, JSON.stringify(mappedData));
-        }
+        const data = await foodLogService.fetchTodayLogs(todayStr);
+        const mappedData = data.map(mapRow);
+        setLogs(mappedData);
+        localStorage.setItem(`food_logs_local_${user.id}`, JSON.stringify(mappedData));
       } catch (err) {
-        console.error('Failed to refresh logs after sync', err);
+        apiLogger.error('Failed to refresh logs after sync', err);
       }
     }
   };
@@ -335,7 +301,7 @@ export function useFoodLogs(
         const updatedActions = existingActions.filter((act: any) => act.tempId !== id);
         localStorage.setItem(`offline_pending_actions_${user.id}`, JSON.stringify(updatedActions));
       } catch (e) {
-        console.error('Failed to update offline actions queue', e);
+        apiLogger.error('Failed to update offline actions queue', e);
       }
       return;
     }
@@ -348,16 +314,15 @@ export function useFoodLogs(
         existingActions.push({ type: 'DELETE', id, timestamp: getCurrentIsoString() });
         localStorage.setItem(`offline_pending_actions_${user.id}`, JSON.stringify(existingActions));
       } catch (e) {
-        console.error('Failed to queue offline delete', e);
+        apiLogger.error('Failed to queue offline delete', e);
       }
       return;
     }
 
     try {
-      const { error } = await supabase.from('food_logs').delete().eq('id', id);
-      if (error) throw error;
+      await foodLogService.deleteFoodLog(id);
     } catch (error) {
-      console.warn('Delete request failed, queuing offline delete action...', error);
+      apiLogger.warn('Delete request failed, queuing offline delete action...', error);
       try {
         const existingActions: OfflineAction[] = JSON.parse(
           localStorage.getItem(`offline_pending_actions_${user.id}`) || '[]',
@@ -365,7 +330,7 @@ export function useFoodLogs(
         existingActions.push({ type: 'DELETE', id, timestamp: getCurrentIsoString() });
         localStorage.setItem(`offline_pending_actions_${user.id}`, JSON.stringify(existingActions));
       } catch (e) {
-        console.error('Failed to queue offline delete after failure', e);
+        apiLogger.error('Failed to queue offline delete after failure', e);
       }
     }
   };
@@ -385,7 +350,7 @@ export function useFoodLogs(
         );
         localStorage.setItem(`offline_pending_actions_${user.id}`, JSON.stringify(updatedActions));
       } catch (e) {
-        console.error('Failed to update pending actions queue', e);
+        apiLogger.error('Failed to update pending actions queue', e);
       }
       return;
     }
@@ -410,28 +375,15 @@ export function useFoodLogs(
         }
         localStorage.setItem(`offline_pending_actions_${user.id}`, JSON.stringify(existingActions));
       } catch (e) {
-        console.error('Failed to queue offline edit', e);
+        apiLogger.error('Failed to queue offline edit', e);
       }
       return;
     }
 
     try {
-      const { error } = await supabase
-        .from('food_logs')
-        .update({
-          name: updatedEntry.name,
-          quantity: updatedEntry.quantity,
-          unit: updatedEntry.unit,
-          calories: updatedEntry.calories,
-          protein: updatedEntry.protein,
-          carbs: updatedEntry.carbs,
-          fats: updatedEntry.fats,
-        })
-        .eq('id', id);
-
-      if (error) throw error;
+      await foodLogService.updateFoodLog(id, updatedEntry);
     } catch (err) {
-      console.warn('Update failed, fallback to local offline edit...', err);
+      apiLogger.warn('Update failed, fallback to local offline edit...', err);
       setLogs((prev) =>
         prev.map((item) =>
           item.id === id ? { ...updatedEntry, isOfflineUpdated: true } : item,
@@ -451,7 +403,7 @@ export function useFoodLogs(
         }
         localStorage.setItem(`offline_pending_actions_${user.id}`, JSON.stringify(existingActions));
       } catch (e) {
-        console.error('Failed to queue offline edit after failure', e);
+        apiLogger.error('Failed to queue offline edit after failure', e);
       }
     }
   };
@@ -467,14 +419,9 @@ export function useFoodLogs(
 
     if (isOnline) {
       try {
-        const { error } = await supabase
-          .from('food_logs')
-          .delete()
-          .eq('date', todayStr);
-
-        if (error) throw error;
+        await foodLogService.deleteTodayLogs(todayStr);
       } catch (err) {
-        console.error('Failed to clear daily entries:', err);
+        apiLogger.error('Failed to clear daily entries:', err);
       }
     }
     localStorage.setItem(`food_logs_local_${user.id}`, JSON.stringify([]));
