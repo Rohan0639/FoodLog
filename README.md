@@ -1,8 +1,4 @@
-# FoodLog
 
-A conversational food diary that uses AI to parse natural-language meal descriptions and track your daily macros.
-
-> "I had 2 bananas and 3 eggs" → logs calories, protein, carbs, and fat automatically.
 
 ---
 
