@@ -3,8 +3,14 @@
   "version": "1.0.0",
   "description": "Root workspace workspace for foodlog serverless application",
   "scripts": {
-    "install:all": "npm install --prefix frontend",
+    "install:all": "npm install && npm install --prefix frontend",
     "dev:frontend": "npm run dev --prefix frontend",
     "dev": "npm run dev --prefix frontend"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.108.1"
+  },
+  "devDependencies": {
+    "@vercel/node": "^3.0.0"
   }
 }

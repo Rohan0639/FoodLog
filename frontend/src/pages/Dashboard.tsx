@@ -4,6 +4,7 @@ import { convertUnit } from '../utils/unitConverter';
 import confetti from 'canvas-confetti';
 import { supabase } from '../lib/supabase';
 import { analyzeFoodClient } from '../utils/geminiParser';
+import { addFoodLogs } from '../services/foodLogService';
 import Navbar from '../components/Navbar';
 import FoodLogger from '../components/FoodLogger';
 import { NutritionDashboard } from '../components/NutritionDashboard';
@@ -268,7 +269,7 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
             };
           });
 
-          const { error } = await supabase.from('food_logs').insert(entriesToSave);
+          const { error } = await addFoodLogs(entriesToSave);
           if (!error) {
             const localEntries = entriesToSave.map((item) => ({
               id: item.id,
@@ -557,10 +558,7 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
         user_id: user.id // Automatically attach user_id
       }));
 
-      const { data: savedEntries, error } = await supabase
-        .from('food_logs')
-        .insert(dbFoods)
-        .select();
+      const { data: savedEntries, error } = await addFoodLogs(dbFoods);
 
       if (error) {
         throw new Error(`Supabase batch save error: ${error.message}`);
