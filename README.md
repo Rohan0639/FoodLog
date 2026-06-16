@@ -9,7 +9,7 @@ A conversational food diary that uses AI to parse natural-language meal descript
 ## Features
 
 - 🤖 **AI-powered parsing** — describe meals in plain English via Gemini API
-- 📊 **Macro tracking** — calories, protein, carbs, fat with daily progress bars
+- 📊 **Macro tracking** — calories, protein, carbs, fat, fiber, sugar  with daily progress bars
 - 📅 **History & calendar** — browse past logs day by day
 - ✏️ **Edit / delete entries** — adjust quantity, unit, and macros inline
 - 🔌 **Offline support** — saves locally, syncs when back online
