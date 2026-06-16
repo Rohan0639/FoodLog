@@ -9,6 +9,8 @@ interface DayLogViewProps {
   totalProtein: number;
   totalCarbs: number;
   totalFats: number;
+  totalSugar: number;
+  totalFiber: number;
   onDeleteEntry: (id: string) => void;
   isLoading?: boolean;
 }
@@ -20,6 +22,8 @@ export const DayLogView: React.FC<DayLogViewProps> = ({
   totalProtein,
   totalCarbs,
   totalFats,
+  totalSugar,
+  totalFiber,
   onDeleteEntry,
   isLoading = false,
 }) => {
@@ -69,10 +73,12 @@ export const DayLogView: React.FC<DayLogViewProps> = ({
                 {totalCalories} <span className="text-xs text-zinc-500 font-mono">kcal</span>
               </span>
             </div>
-            <div className="flex justify-between text-[10px] text-zinc-400 font-mono">
+            <div className="flex flex-wrap justify-between gap-x-2 gap-y-1 text-[10px] text-zinc-400 font-mono">
               <span>Protein: <strong className="text-zinc-200 font-semibold">{totalProtein}g</strong></span>
               <span>Carbs: <strong className="text-zinc-200 font-semibold">{totalCarbs}g</strong></span>
               <span>Fat: <strong className="text-zinc-200 font-semibold">{totalFats}g</strong></span>
+              <span>Sugar: <strong className="text-zinc-200 font-semibold">{totalSugar}g</strong></span>
+              <span>Fiber: <strong className="text-zinc-200 font-semibold">{totalFiber}g</strong></span>
             </div>
           </div>
 
@@ -120,7 +126,7 @@ export const DayLogView: React.FC<DayLogViewProps> = ({
                           {item.quantity} {item.unit}
                         </p>
                         <p className="text-[9px] text-zinc-500 mt-1.5 font-bold font-mono">
-                          P: {item.protein}g • C: {item.carbs}g • F: {item.fats}g
+                          P: {item.protein}g • C: {item.carbs}g • F: {item.fats}g • S: {item.sugar || 0}g • Fib: {item.fiber || 0}g
                         </p>
                       </div>
 

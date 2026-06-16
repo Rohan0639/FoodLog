@@ -7,6 +7,8 @@ export interface ParsedItem {
   protein: number;
   carbs: number;
   fat: number;
+  sugar: number;
+  fiber: number;
 }
 
 export interface ParsedTotals {
@@ -14,6 +16,8 @@ export interface ParsedTotals {
   protein: number;
   carbs: number;
   fat: number;
+  sugar: number;
+  fiber: number;
 }
 
 export interface GeminiResponse {
@@ -69,8 +73,8 @@ function validateGeminiResponse(data: any) {
   const totals = data.totals;
   
   // C. Logical Limits (totals)
-  if (totals.calories < 0 || totals.protein < 0 || totals.carbs < 0 || totals.fat < 0) {
-    throw new Error("Logical limit failure: negative macro values in totals");
+  if (totals.calories < 0 || totals.protein < 0 || totals.carbs < 0 || totals.fat < 0 || totals.sugar < 0 || totals.fiber < 0) {
+    throw new Error("Logical limit failure: negative macro or nutrient values in totals");
   }
   if (totals.calories > 5000) {
     throw new Error(`Logical limit failure: total calories (${totals.calories}) exceed 5000 kcal`);
@@ -90,13 +94,14 @@ function validateGeminiResponse(data: any) {
   for (let i = 0; i < data.items.length; i++) {
     const item = data.items[i];
     if (typeof item.calories !== 'number' || typeof item.protein !== 'number' ||
-        typeof item.carbs !== 'number' || typeof item.fat !== 'number') {
-      throw new Error(`Validation failure on item "${item.name}": macro values must be numbers`);
+        typeof item.carbs !== 'number' || typeof item.fat !== 'number' ||
+        typeof item.sugar !== 'number' || typeof item.fiber !== 'number') {
+      throw new Error(`Validation failure on item "${item.name}": nutrient values must be numbers`);
     }
 
     // C. Logical Limits (item)
-    if (item.calories < 0 || item.protein < 0 || item.carbs < 0 || item.fat < 0) {
-      throw new Error(`Logical limit failure on item "${item.name}": negative macro values`);
+    if (item.calories < 0 || item.protein < 0 || item.carbs < 0 || item.fat < 0 || item.sugar < 0 || item.fiber < 0) {
+      throw new Error(`Logical limit failure on item "${item.name}": negative nutrient values`);
     }
 
     // B. Macro Consistency (item)
@@ -186,18 +191,22 @@ Valid response format:
       "calories": number,
       "protein": number,
       "carbs": number,
-      "fat": number
+      "fat": number,
+      "sugar": number,
+      "fiber": number
     }
   ],
   "totals": {
     "calories": number,
     "protein": number,
     "carbs": number,
-    "fat": number
+    "fat": number,
+    "sugar": number,
+    "fiber": number
   }
 }
 
-Use realistic values for macros and calories:
+Use realistic values for macros, sugar, fiber and calories:
 - Max calories per gram ≤ 9 kcal
 - Ensure macros match calories:
   calories ≈ (protein×4 + carbs×4 + fat×9)

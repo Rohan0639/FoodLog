@@ -7,6 +7,8 @@ export interface FoodItem {
   protein: number;
   carbs: number;
   fats: number;
+  sugar: number;
+  fiber: number;
   createdAt: string;
   baseQuantity?: number;
   baseUnit?: string;
@@ -21,6 +23,8 @@ export interface FoodEntry {
   protein: number;
   carbs: number;
   fats: number;
+  sugar: number;
+  fiber: number;
   createdAt: string;
   isOffline?: boolean;
   isOfflineUpdated?: boolean;
@@ -35,6 +39,8 @@ export interface ParsedItem {
   protein: number;
   carbs: number;
   fat: number;
+  sugar: number;
+  fiber: number;
 }
 
 export interface ParsedTotals {
@@ -42,6 +48,8 @@ export interface ParsedTotals {
   protein: number;
   carbs: number;
   fat: number;
+  sugar: number;
+  fiber: number;
 }
 
 export interface ParsedData {
@@ -87,6 +95,8 @@ export interface NutritionSummary {
   protein: number;
   carbs: number;
   fat: number;
+  sugar: number;
+  fiber: number;
 }
 
 export interface DailyGoal {
@@ -94,5 +104,7 @@ export interface DailyGoal {
   protein: number;
   carbs: number;
   fat: number;
+  sugar: number;
+  fiber: number;
 }
 

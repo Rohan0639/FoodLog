@@ -40,11 +40,15 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
   const totalProtein = Math.round(logs.reduce((acc, curr) => acc + (curr.protein || 0), 0) * 10) / 10;
   const totalCarbs = Math.round(logs.reduce((acc, curr) => acc + (curr.carbs || 0), 0) * 10) / 10;
   const totalFat = Math.round(logs.reduce((acc, curr) => acc + (curr.fats || 0), 0) * 10) / 10;
+  const totalSugar = Math.round(logs.reduce((acc, curr) => acc + (curr.sugar || 0), 0) * 10) / 10;
+  const totalFiber = Math.round(logs.reduce((acc, curr) => acc + (curr.fiber || 0), 0) * 10) / 10;
 
   const calPercent = Math.min(Math.round((totalCalories / dailyGoal.calories) * 105) / 105, 1);
   const proPercent = Math.min(Math.round((totalProtein / dailyGoal.protein) * 105) / 105, 1);
   const carbPercent = Math.min(Math.round((totalCarbs / dailyGoal.carbs) * 105) / 105, 1);
   const fatPercent = Math.min(Math.round((totalFat / dailyGoal.fat) * 105) / 105, 1);
+  const sugarPercent = Math.min(Math.round((totalSugar / (dailyGoal.sugar || 50)) * 105) / 105, 1);
+  const fiberPercent = Math.min(Math.round((totalFiber / (dailyGoal.fiber || 30)) * 105) / 105, 1);
 
   // History State
   const [selectedDate, setSelectedDate] = useState<string>(getLocalIsoDate());
@@ -57,6 +61,8 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
     totalProtein: number;
     totalCarbs: number;
     totalFats: number;
+    totalSugar: number;
+    totalFiber: number;
   } | null>(null);
 
   const [stats, setStats] = useState<{
@@ -122,6 +128,8 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
         protein: item.protein,
         carbs: item.carbs,
         fats: item.fats,
+        sugar: item.sugar || 0,
+        fiber: item.fiber || 0,
         createdAt: item.created_at
       }));
 
@@ -129,6 +137,8 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
       const totalProtein = Math.round(items.reduce((acc, curr) => acc + (curr.protein || 0), 0) * 10) / 10;
       const totalCarbs = Math.round(items.reduce((acc, curr) => acc + (curr.carbs || 0), 0) * 10) / 10;
       const totalFats = Math.round(items.reduce((acc, curr) => acc + (curr.fats || 0), 0) * 10) / 10;
+      const totalSugar = Math.round(items.reduce((acc, curr) => acc + (curr.sugar || 0), 0) * 10) / 10;
+      const totalFiber = Math.round(items.reduce((acc, curr) => acc + (curr.fiber || 0), 0) * 10) / 10;
 
       const result = {
         date,
@@ -136,7 +146,9 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
         totalCalories,
         totalProtein,
         totalCarbs,
-        totalFats
+        totalFats,
+        totalSugar,
+        totalFiber
       };
 
       setSelectedDateLog(result);
@@ -431,7 +443,7 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
                 <div>
                   <div className="flex justify-between text-xs mb-1.5">
                     <span className="font-semibold text-zinc-200 flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-zinc-650" />
+                      <span className="w-2 h-2 rounded-full bg-zinc-600" />
                       Fat
                     </span>
                     <span className="text-zinc-400 font-mono font-medium">
@@ -440,8 +452,46 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
                   </div>
                   <div className="w-full h-1.5 bg-zinc-900 rounded-full overflow-hidden border border-zinc-800/60">
                     <div
-                      className="h-full bg-zinc-650 transition-all duration-500 rounded-full"
+                      className="h-full bg-zinc-600 transition-all duration-500 rounded-full"
                       style={{ width: `${fatPercent * 100}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Sugar */}
+                <div>
+                  <div className="flex justify-between text-xs mb-1.5">
+                    <span className="font-semibold text-zinc-200 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-[#FFB7B2]" />
+                      Sugar
+                    </span>
+                    <span className="text-zinc-400 font-mono font-medium">
+                      <strong className="text-white">{totalSugar}g</strong> / {dailyGoal.sugar || 50}g
+                    </span>
+                  </div>
+                  <div className="w-full h-1.5 bg-zinc-900 rounded-full overflow-hidden border border-zinc-800/60">
+                    <div
+                      className="h-full bg-[#FFB7B2] transition-all duration-500 rounded-full"
+                      style={{ width: `${sugarPercent * 100}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Fiber */}
+                <div>
+                  <div className="flex justify-between text-xs mb-1.5">
+                    <span className="font-semibold text-zinc-200 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-[#B5EAD7]" />
+                      Fiber
+                    </span>
+                    <span className="text-zinc-400 font-mono font-medium">
+                      <strong className="text-white">{totalFiber}g</strong> / {dailyGoal.fiber || 30}g
+                    </span>
+                  </div>
+                  <div className="w-full h-1.5 bg-zinc-900 rounded-full overflow-hidden border border-zinc-800/60">
+                    <div
+                      className="h-full bg-[#B5EAD7] transition-all duration-500 rounded-full"
+                      style={{ width: `${fiberPercent * 100}%` }}
                     />
                   </div>
                 </div>
@@ -520,7 +570,7 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
                               </p>
 
                               <p className="text-[9px] text-zinc-500 mt-1.5 font-bold font-mono">
-                                P: {item.protein}g • C: {item.carbs}g • F: {item.fats}g
+                                P: {item.protein}g • C: {item.carbs}g • F: {item.fats}g • S: {item.sugar || 0}g • Fib: {item.fiber || 0}g
                               </p>
                             </div>
                             
@@ -581,6 +631,8 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
               totalProtein={selectedDateLog?.totalProtein || 0}
               totalCarbs={selectedDateLog?.totalCarbs || 0}
               totalFats={selectedDateLog?.totalFats || 0}
+              totalSugar={selectedDateLog?.totalSugar || 0}
+              totalFiber={selectedDateLog?.totalFiber || 0}
               onDeleteEntry={handleDeleteHistoryEntry}
               isLoading={isHistoryLoading}
             />

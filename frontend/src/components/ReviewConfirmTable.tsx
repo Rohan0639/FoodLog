@@ -43,7 +43,7 @@ export const ReviewConfirmTable: React.FC<ReviewConfirmTableProps> = ({
   const getScaledMacros = (item: FoodEntry) => {
     const quantity = item.quantity;
     if (quantity <= 0 || isNaN(quantity)) {
-      return { calories: 0, protein: 0, carbs: 0, fats: 0 };
+      return { calories: 0, protein: 0, carbs: 0, fats: 0, sugar: 0, fiber: 0 };
     }
     try {
       const baseUnit = item.baseUnit || item.unit || 'g';
@@ -56,6 +56,8 @@ export const ReviewConfirmTable: React.FC<ReviewConfirmTableProps> = ({
         protein: Math.max(0, Math.round(item.protein * scale * 10) / 10),
         carbs: Math.max(0, Math.round(item.carbs * scale * 10) / 10),
         fats: Math.max(0, Math.round(item.fats * scale * 10) / 10),
+        sugar: Math.max(0, Math.round((item.sugar || 0) * scale * 10) / 10),
+        fiber: Math.max(0, Math.round((item.fiber || 0) * scale * 10) / 10),
       };
     } catch (err) {
       console.error('Unit conversion failed:', err);
@@ -64,6 +66,8 @@ export const ReviewConfirmTable: React.FC<ReviewConfirmTableProps> = ({
         protein: item.protein,
         carbs: item.carbs,
         fats: item.fats,
+        sugar: item.sugar || 0,
+        fiber: item.fiber || 0,
       };
     }
   };
@@ -77,9 +81,11 @@ export const ReviewConfirmTable: React.FC<ReviewConfirmTableProps> = ({
         protein: acc.protein + scaled.protein,
         carbs: acc.carbs + scaled.carbs,
         fats: acc.fats + scaled.fats,
+        sugar: acc.sugar + scaled.sugar,
+        fiber: acc.fiber + scaled.fiber,
       };
     },
-    { calories: 0, protein: 0, carbs: 0, fats: 0 }
+    { calories: 0, protein: 0, carbs: 0, fats: 0, sugar: 0, fiber: 0 }
   );
 
   return (
@@ -147,7 +153,7 @@ export const ReviewConfirmTable: React.FC<ReviewConfirmTableProps> = ({
                     <div className="text-right font-mono">
                       <div className="text-white font-bold text-[11px]">{scaled.calories} kcal</div>
                       <div className="text-[8.5px] text-zinc-400 mt-0.5">
-                        P:{scaled.protein}g | C:{scaled.carbs}g | F:{scaled.fats}g
+                        P:{scaled.protein}g | C:{scaled.carbs}g | F:{scaled.fats}g | S:{scaled.sugar}g | Fib:{scaled.fiber}g
                       </div>
                     </div>
                   </div>
@@ -211,7 +217,7 @@ export const ReviewConfirmTable: React.FC<ReviewConfirmTableProps> = ({
                       <td className="py-2.5 sm:py-3 text-right font-mono">
                         <div className="text-white font-bold text-[11px] sm:text-xs">{scaled.calories} kcal</div>
                         <div className="text-[8px] sm:text-[9px] text-zinc-400 mt-0.5">
-                          P:{scaled.protein}g | C:{scaled.carbs}g | F:{scaled.fats}g
+                          P:{scaled.protein}g | C:{scaled.carbs}g | F:{scaled.fats}g | S:{scaled.sugar}g | Fib:{scaled.fiber}g
                         </div>
                       </td>
 
@@ -243,10 +249,12 @@ export const ReviewConfirmTable: React.FC<ReviewConfirmTableProps> = ({
             <span>Total Estimated Intake</span>
             <span className="font-mono text-white text-sm">{totals.calories} kcal</span>
           </div>
-          <div className="flex justify-between text-[10px] text-zinc-400 font-mono pl-0">
+          <div className="flex flex-wrap justify-between gap-x-2 gap-y-1 text-[10px] text-zinc-400 font-mono pl-0">
             <span>Protein: <strong className="text-zinc-300 font-semibold">{Math.round(totals.protein * 10) / 10}g</strong></span>
             <span>Carbs: <strong className="text-zinc-300 font-semibold">{Math.round(totals.carbs * 10) / 10}g</strong></span>
             <span>Fat: <strong className="text-zinc-300 font-semibold">{Math.round(totals.fats * 10) / 10}g</strong></span>
+            <span>Sugar: <strong className="text-zinc-300 font-semibold">{Math.round(totals.sugar * 10) / 10}g</strong></span>
+            <span>Fiber: <strong className="text-zinc-300 font-semibold">{Math.round(totals.fiber * 10) / 10}g</strong></span>
           </div>
         </div>
       )}
