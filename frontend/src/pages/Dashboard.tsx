@@ -14,6 +14,8 @@ const DEFAULT_DAILY_GOAL: DailyGoal = {
   protein: 135,
   carbs: 230,
   fat: 70,
+  sugar: 50,
+  fiber: 30,
 };
 
 const generateMessageId = (sender: string): string => {
@@ -118,6 +120,8 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
           protein: item.protein,
           carbs: item.carbs,
           fats: item.fats,
+          sugar: item.sugar || 0,
+          fiber: item.fiber || 0,
           createdAt: item.created_at
         }));
 
@@ -197,6 +201,8 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
               protein: item.protein,
               carbs: item.carbs,
               fats: item.fats,
+              sugar: item.sugar || 0,
+              fiber: item.fiber || 0,
               createdAt: item.created_at
             }));
             setLogs(mappedData);
@@ -262,6 +268,8 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
               protein: item.protein || 0,
               carbs: item.carbs || 0,
               fats: item.fat || 0,
+              sugar: item.sugar || 0,
+              fiber: item.fiber || 0,
               created_at: timestamp,
               date: parseLocalDateString(timestamp),
               user_id: user.id // Attach current user.id
@@ -279,6 +287,8 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
               protein: item.protein,
               carbs: item.carbs,
               fats: item.fats,
+              sugar: item.sugar,
+              fiber: item.fiber,
               createdAt: item.created_at
             }));
             setLogs((prev) => {
@@ -304,7 +314,9 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
               calories: action.entry.calories,
               protein: action.entry.protein,
               carbs: action.entry.carbs,
-              fats: action.entry.fats
+              fats: action.entry.fats,
+              sugar: action.entry.sugar || 0,
+              fiber: action.entry.fiber || 0
             })
             .eq('id', action.id);
 
@@ -353,6 +365,8 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
             protein: item.protein,
             carbs: item.carbs,
             fats: item.fats,
+            sugar: item.sugar || 0,
+            fiber: item.fiber || 0,
             createdAt: item.created_at
           }));
           setLogs(mappedData);
@@ -434,6 +448,8 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
           protein: item.protein || 0,
           carbs: item.carbs || 0,
           fats: item.fat || 0,
+          sugar: item.sugar || 0,
+          fiber: item.fiber || 0,
           createdAt: new Date().toISOString()
         };
       });
@@ -468,6 +484,8 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
         protein: 0,
         carbs: 0,
         fats: 0,
+        sugar: 0,
+        fiber: 0,
         createdAt: getCurrentIsoString(),
         isOffline: true
       };
@@ -510,7 +528,14 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
     try {
       const finalizedFoods = activeFoods.map((item) => {
         const quantity = item.quantity;
-        let scaled = { calories: item.calories, protein: item.protein, carbs: item.carbs, fats: item.fats };
+        let scaled = {
+          calories: item.calories,
+          protein: item.protein,
+          carbs: item.carbs,
+          fats: item.fats,
+          sugar: item.sugar || 0,
+          fiber: item.fiber || 0
+        };
         
         if (quantity > 0 && !isNaN(quantity)) {
           try {
@@ -524,6 +549,8 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
               protein: Math.max(0, Math.round(item.protein * scale * 10) / 10),
               carbs: Math.max(0, Math.round(item.carbs * scale * 10) / 10),
               fats: Math.max(0, Math.round(item.fats * scale * 10) / 10),
+              sugar: Math.max(0, Math.round((item.sugar || 0) * scale * 10) / 10),
+              fiber: Math.max(0, Math.round((item.fiber || 0) * scale * 10) / 10),
             };
           } catch (err) {
             console.error('Scale error:', err);
@@ -539,6 +566,8 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
           protein: scaled.protein,
           carbs: scaled.carbs,
           fats: scaled.fats,
+          sugar: scaled.sugar,
+          fiber: scaled.fiber,
           createdAt: item.createdAt || new Date().toISOString()
         };
       });
@@ -552,6 +581,8 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
         protein: item.protein,
         carbs: item.carbs,
         fats: item.fats,
+        sugar: item.sugar,
+        fiber: item.fiber,
         created_at: item.createdAt,
         date: parseLocalDateString(item.createdAt),
         user_id: user.id // Automatically attach user_id
@@ -575,6 +606,8 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
         protein: item.protein,
         carbs: item.carbs,
         fats: item.fats,
+        sugar: item.sugar || 0,
+        fiber: item.fiber || 0,
         createdAt: item.created_at
       }));
 
@@ -736,7 +769,9 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
           calories: updatedEntry.calories,
           protein: updatedEntry.protein,
           carbs: updatedEntry.carbs,
-          fats: updatedEntry.fats
+          fats: updatedEntry.fats,
+          sugar: updatedEntry.sugar || 0,
+          fiber: updatedEntry.fiber || 0
         })
         .eq('id', id);
 

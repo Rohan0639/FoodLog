@@ -24,6 +24,8 @@ export const EditFoodModal: React.FC<EditFoodModalProps> = ({
   const [protein, setProtein] = useState(entry.protein);
   const [carbs, setCarbs] = useState(entry.carbs);
   const [fats, setFats] = useState(entry.fats);
+  const [sugar, setSugar] = useState(entry.sugar || 0);
+  const [fiber, setFiber] = useState(entry.fiber || 0);
 
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,6 +47,8 @@ export const EditFoodModal: React.FC<EditFoodModalProps> = ({
       setProtein(Math.max(0, Math.round(entry.protein * scale * 10) / 10));
       setCarbs(Math.max(0, Math.round(entry.carbs * scale * 10) / 10));
       setFats(Math.max(0, Math.round(entry.fats * scale * 10) / 10));
+      setSugar(Math.max(0, Math.round((entry.sugar || 0) * scale * 10) / 10));
+      setFiber(Math.max(0, Math.round((entry.fiber || 0) * scale * 10) / 10));
       setError(null);
     } catch (err) {
       console.error('Recalculation error:', err);
@@ -78,6 +82,8 @@ export const EditFoodModal: React.FC<EditFoodModalProps> = ({
         protein,
         carbs,
         fats,
+        sugar,
+        fiber,
       });
       onClose();
     } catch (err: any) {
@@ -183,9 +189,9 @@ export const EditFoodModal: React.FC<EditFoodModalProps> = ({
           {/* Recalculated Macros Preview */}
           <div className="p-3 bg-black rounded-xl border border-zinc-900 space-y-2">
             <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider font-mono">
-              Live Macro Recalculation
+              Live Nutrient Recalculation
             </span>
-            <div className="grid grid-cols-4 gap-2 text-center">
+            <div className="grid grid-cols-3 gap-2 text-center">
               <div className="p-1.5 bg-zinc-950 border border-zinc-900 rounded-lg">
                 <span className="block text-[10px] font-bold text-white font-mono">{calories}</span>
                 <span className="text-[8px] text-zinc-500 uppercase tracking-wider">Calories</span>
@@ -201,6 +207,14 @@ export const EditFoodModal: React.FC<EditFoodModalProps> = ({
               <div className="p-1.5 bg-zinc-950 border border-zinc-900 rounded-lg">
                 <span className="block text-[10px] font-bold text-white font-mono">{fats}g</span>
                 <span className="text-[8px] text-zinc-500 uppercase tracking-wider">Fat</span>
+              </div>
+              <div className="p-1.5 bg-zinc-950 border border-zinc-900 rounded-lg">
+                <span className="block text-[10px] font-bold text-white font-mono">{sugar}g</span>
+                <span className="text-[8px] text-zinc-500 uppercase tracking-wider">Sugar</span>
+              </div>
+              <div className="p-1.5 bg-zinc-950 border border-zinc-900 rounded-lg">
+                <span className="block text-[10px] font-bold text-white font-mono">{fiber}g</span>
+                <span className="text-[8px] text-zinc-500 uppercase tracking-wider">Fiber</span>
               </div>
             </div>
           </div>
