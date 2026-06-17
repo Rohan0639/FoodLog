@@ -35,5 +35,9 @@ backend/.env.*.local
 # Databases
 *.db
 
+# Vercel
+.vercel
+
+
 
 

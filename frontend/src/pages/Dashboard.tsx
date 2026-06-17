@@ -1,9 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import type { Message, DailyGoal, OfflineAction, FoodEntry } from '../types';
+import type { Message, DailyGoal, OfflineAction, FoodEntry, ParsedItem } from '../types';
 import { convertUnit } from '../utils/unitConverter';
 import confetti from 'canvas-confetti';
 import { supabase } from '../lib/supabase';
 import { analyzeFoodClient } from '../utils/geminiParser';
+import { analyzeFoodServer } from '../utils/serverParser';
+
+const USE_BACKEND = true;
 import Navbar from '../components/Navbar';
 import FoodLogger from '../components/FoodLogger';
 import { NutritionDashboard } from '../components/NutritionDashboard';
@@ -248,37 +251,62 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
     for (const action of actions) {
       try {
         if (action.type === 'ADD') {
-          const parseData = await analyzeFoodClient(action.text!);
-          if (parseData.status === 'invalid') {
-            setLogs((prev) => prev.filter((item) => item.id !== action.tempId));
-            remainingActions.shift();
-            continue;
+          let entriesToSave;
+          if (action.parsedEntries && action.parsedEntries.length > 0) {
+            entriesToSave = action.parsedEntries.map((item: FoodEntry) => {
+              const timestamp = item.createdAt || action.timestamp || new Date().toISOString();
+              return {
+                id: item.id || crypto.randomUUID(),
+                name: item.name || 'Unknown',
+                quantity: item.quantity,
+                unit: item.unit,
+                calories: item.calories || 0,
+                protein: item.protein || 0,
+                carbs: item.carbs || 0,
+                fats: item.fats || 0,
+                sugar: item.sugar || 0,
+                fiber: item.fiber || 0,
+                created_at: timestamp,
+                date: parseLocalDateString(timestamp),
+                user_id: user.id
+              };
+            });
+          } else {
+            const parseData = USE_BACKEND
+              ? await analyzeFoodServer(action.text!)
+              : await analyzeFoodClient(action.text!);
+
+            if (parseData.status === 'invalid') {
+              setLogs((prev) => prev.filter((item) => item.id !== action.tempId));
+              remainingActions.shift();
+              continue;
+            }
+            const items = parseData.items || [];
+            entriesToSave = items.map((item: ParsedItem) => {
+              const rawQty = parseFloat(item.quantity) || 1;
+              const rawUnit = item.quantity.replace(/^\d+(?:\.\d+)?\s*/, '') || 'piece';
+              const timestamp = action.timestamp || new Date().toISOString();
+              return {
+                id: crypto.randomUUID(),
+                name: item.name || 'Unknown',
+                quantity: rawQty,
+                unit: rawUnit,
+                calories: item.calories || 0,
+                protein: item.protein || 0,
+                carbs: item.carbs || 0,
+                fats: item.fat || 0,
+                sugar: item.sugar || 0,
+                fiber: item.fiber || 0,
+                created_at: timestamp,
+                date: parseLocalDateString(timestamp),
+                user_id: user.id
+              };
+            });
           }
-          const items = parseData.items || [];
-          const entriesToSave = items.map((item) => {
-            const rawQty = parseFloat(item.quantity) || 1;
-            const rawUnit = item.quantity.replace(/^\d+(?:\.\d+)?\s*/, '') || 'piece';
-            const timestamp = action.timestamp || new Date().toISOString();
-            return {
-              id: crypto.randomUUID(),
-              name: item.name || 'Unknown',
-              quantity: rawQty,
-              unit: rawUnit,
-              calories: item.calories || 0,
-              protein: item.protein || 0,
-              carbs: item.carbs || 0,
-              fats: item.fat || 0,
-              sugar: item.sugar || 0,
-              fiber: item.fiber || 0,
-              created_at: timestamp,
-              date: parseLocalDateString(timestamp),
-              user_id: user.id // Attach current user.id
-            };
-          });
 
           const { error } = await supabase.from('food_logs').insert(entriesToSave);
           if (!error) {
-            const localEntries = entriesToSave.map((item) => ({
+            const localEntries = entriesToSave.map((item: any) => ({
               id: item.id,
               name: item.name,
               quantity: item.quantity,
@@ -421,7 +449,9 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
     setIsBotTyping(true);
 
     try {
-      const parseData = await analyzeFoodClient(text);
+      const parseData = USE_BACKEND
+        ? await analyzeFoodServer(text)
+        : await analyzeFoodClient(text);
       if (parseData.status === 'invalid') {
         const botMsg: Message = {
           id: generateMessageId('bot'),
@@ -434,7 +464,7 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
         return;
       }
       const items = parseData.items || [];
-      const newEntries: FoodEntry[] = items.map((item) => {
+      const newEntries: FoodEntry[] = items.map((item: ParsedItem) => {
         const rawQty = parseFloat(item.quantity) || 1;
         const rawUnit = item.quantity.replace(/^\d+(?:\.\d+)?\s*/, '') || 'piece';
         return {
@@ -525,8 +555,10 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
     if (activeFoods.length === 0) return;
     setIsBotTyping(true);
 
+    let finalizedFoods: FoodEntry[] = [];
+
     try {
-      const finalizedFoods = activeFoods.map((item) => {
+      finalizedFoods = activeFoods.map((item: FoodEntry) => {
         const quantity = item.quantity;
         let scaled = {
           calories: item.calories,
@@ -572,7 +604,7 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
         };
       });
 
-      const dbFoods = finalizedFoods.map((item) => ({
+      const dbFoods = finalizedFoods.map((item: FoodEntry) => ({
         id: item.id,
         name: item.name,
         quantity: item.quantity,
@@ -634,7 +666,45 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
         )
       );
     } catch (err) {
-      console.error('Failed to confirm and log food:', err);
+      console.warn('Failed to confirm and save to Supabase. Storing parsed entries offline...', err);
+
+      // Mark finalized foods as offline
+      const offlineEntries = finalizedFoods.map(item => ({
+        ...item,
+        isOffline: true
+      }));
+
+      // Add to logs state so user sees them immediately
+      setLogs((prev) => [...offlineEntries, ...prev]);
+
+      // Queue offline ADD action
+      try {
+        const tempId = generateTempId();
+        const existingActions: OfflineAction[] = JSON.parse(localStorage.getItem(`offline_pending_actions_${user.id}`) || '[]');
+        existingActions.push({
+          type: 'ADD',
+          tempId,
+          parsedEntries: offlineEntries,
+          timestamp: getCurrentIsoString()
+        });
+        localStorage.setItem(`offline_pending_actions_${user.id}`, JSON.stringify(existingActions));
+      } catch (storageErr) {
+        console.error('Failed to write offline action to localStorage:', storageErr);
+      }
+
+      // Show bot notification
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === activeReviewMessageId
+            ? {
+                ...msg,
+                text: "Saved offline. Will save to database when online. 🍳",
+                pendingFoods: undefined,
+                parsedFoods: []
+              }
+            : msg
+        )
+      );
     } finally {
       setActiveReviewMessageId(null);
       setActiveFoods([]);

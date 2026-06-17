@@ -58,6 +58,14 @@ export interface ParsedData {
   totals: ParsedTotals;
 }
 
+export interface GeminiResponse {
+  status: 'valid' | 'invalid';
+  reason?: string;
+  reply?: string;
+  items?: ParsedItem[];
+  totals?: ParsedTotals;
+}
+
 export interface FoodLog {
   _id: string;
   userId: string;
@@ -75,6 +83,7 @@ export interface OfflineAction {
   tempId?: string;
   text?: string;
   entry?: FoodEntry;
+  parsedEntries?: FoodEntry[];
   timestamp: string;
 }
 
