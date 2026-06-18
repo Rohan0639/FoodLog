@@ -140,3 +140,61 @@ export function convertUnit(value: number, fromUnit: string, toUnit: string, foo
   
   return valueInTargetBase / toFactor;
 }
+
+export interface BaseMacros {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+  sugar?: number;
+  fiber?: number;
+}
+
+export interface ScaledMacros {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+  sugar: number;
+  fiber: number;
+}
+
+/**
+ * Scales a set of base macros from baseQuantity/baseUnit to newQuantity/newUnit.
+ *
+ * Rounding contract (matches all three original call-sites exactly):
+ *   calories  → Math.round           (integer)
+ *   protein, carbs, fats, sugar, fiber → Math.round(x * 10) / 10  (1 dp)
+ *   All values are floored at 0 via Math.max(0, ...).
+ *
+ * Returns all-zeros when newQuantity <= 0 or is NaN.
+ * Defaults sugar/fiber to 0 when undefined on baseMacros.
+ *
+ * NOTE: callers are responsible for passing the correct baseUnit/baseQuantity
+ * fallback values (e.g. `item.baseUnit || item.unit`). This function does NOT
+ * bake in any fallback logic so that each caller can keep its own semantics.
+ */
+export function scaleMacrosByQuantity(
+  baseMacros: BaseMacros,
+  newQuantity: number,
+  newUnit: string,
+  baseQuantity: number,
+  baseUnit: string,
+  foodName: string,
+): ScaledMacros {
+  if (newQuantity <= 0 || isNaN(newQuantity)) {
+    return { calories: 0, protein: 0, carbs: 0, fats: 0, sugar: 0, fiber: 0 };
+  }
+
+  const scaledQuantity = convertUnit(newQuantity, newUnit, baseUnit, foodName);
+  const scale = scaledQuantity / baseQuantity;
+
+  return {
+    calories: Math.max(0, Math.round(baseMacros.calories * scale)),
+    protein:  Math.max(0, Math.round(baseMacros.protein  * scale * 10) / 10),
+    carbs:    Math.max(0, Math.round(baseMacros.carbs    * scale * 10) / 10),
+    fats:     Math.max(0, Math.round(baseMacros.fats     * scale * 10) / 10),
+    sugar:    Math.max(0, Math.round((baseMacros.sugar  ?? 0) * scale * 10) / 10),
+    fiber:    Math.max(0, Math.round((baseMacros.fiber  ?? 0) * scale * 10) / 10),
+  };
+}
