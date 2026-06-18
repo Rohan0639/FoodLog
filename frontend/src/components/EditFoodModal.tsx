@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { FoodEntry } from '../types';
-import { convertUnit, UNIT_CATEGORIES } from '../utils/unitConverter';
+import { UNIT_CATEGORIES, scaleMacrosByQuantity } from '../utils/unitConverter';
 import { X, Loader2, AlertCircle } from 'lucide-react';
 
 interface EditFoodModalProps {
@@ -37,18 +37,20 @@ export const EditFoodModal: React.FC<EditFoodModalProps> = ({
     }
 
     try {
-      // Convert new quantity in new unit back to original base unit
-      const scaledQuantity = convertUnit(quantity, unit || 'g', entry.unit || 'g', entry.name);
-      
-      // Calculate scale factor relative to the base entry values
-      const scale = scaledQuantity / entry.quantity;
-
-      setCalories(Math.max(0, Math.round(entry.calories * scale)));
-      setProtein(Math.max(0, Math.round(entry.protein * scale * 10) / 10));
-      setCarbs(Math.max(0, Math.round(entry.carbs * scale * 10) / 10));
-      setFats(Math.max(0, Math.round(entry.fats * scale * 10) / 10));
-      setSugar(Math.max(0, Math.round((entry.sugar || 0) * scale * 10) / 10));
-      setFiber(Math.max(0, Math.round((entry.fiber || 0) * scale * 10) / 10));
+      const scaled = scaleMacrosByQuantity(
+        entry,
+        quantity,
+        unit || 'g',
+        entry.quantity,
+        entry.unit || 'g',
+        entry.name,
+      );
+      setCalories(scaled.calories);
+      setProtein(scaled.protein);
+      setCarbs(scaled.carbs);
+      setFats(scaled.fats);
+      setSugar(scaled.sugar);
+      setFiber(scaled.fiber);
       setError(null);
     } catch (err) {
       console.error('Recalculation error:', err);

@@ -1,6 +1,6 @@
 import React from 'react';
 import type { FoodEntry } from '../types';
-import { convertUnit } from '../utils/unitConverter';
+import { scaleMacrosByQuantity } from '../utils/unitConverter';
 import { Check, X } from 'lucide-react';
 
 interface ReviewConfirmTableProps {
@@ -48,17 +48,7 @@ export const ReviewConfirmTable: React.FC<ReviewConfirmTableProps> = ({
     try {
       const baseUnit = item.baseUnit || item.unit || 'g';
       const baseQty = item.baseQuantity || item.quantity;
-      const scaledQuantity = convertUnit(quantity, item.unit || 'g', baseUnit, item.name);
-      const scale = scaledQuantity / baseQty;
-
-      return {
-        calories: Math.max(0, Math.round(item.calories * scale)),
-        protein: Math.max(0, Math.round(item.protein * scale * 10) / 10),
-        carbs: Math.max(0, Math.round(item.carbs * scale * 10) / 10),
-        fats: Math.max(0, Math.round(item.fats * scale * 10) / 10),
-        sugar: Math.max(0, Math.round((item.sugar || 0) * scale * 10) / 10),
-        fiber: Math.max(0, Math.round((item.fiber || 0) * scale * 10) / 10),
-      };
+      return scaleMacrosByQuantity(item, quantity, item.unit || 'g', baseQty, baseUnit, item.name);
     } catch (err) {
       console.error('Unit conversion failed:', err);
       return {

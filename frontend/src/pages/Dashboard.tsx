@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import type { Message, DailyGoal, OfflineAction, FoodEntry, ParsedItem } from '../types';
-import { convertUnit } from '../utils/unitConverter';
+import { scaleMacrosByQuantity } from '../utils/unitConverter';
 import confetti from 'canvas-confetti';
 import { supabase } from '../lib/supabase';
 import { analyzeFoodClient } from '../utils/geminiParser';
@@ -573,17 +573,7 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
           try {
             const baseUnit = item.baseUnit || item.unit;
             const baseQty = item.baseQuantity || item.quantity;
-            const scaledQuantity = convertUnit(quantity, item.unit, baseUnit, item.name);
-            const scale = scaledQuantity / baseQty;
-
-            scaled = {
-              calories: Math.max(0, Math.round(item.calories * scale)),
-              protein: Math.max(0, Math.round(item.protein * scale * 10) / 10),
-              carbs: Math.max(0, Math.round(item.carbs * scale * 10) / 10),
-              fats: Math.max(0, Math.round(item.fats * scale * 10) / 10),
-              sugar: Math.max(0, Math.round((item.sugar || 0) * scale * 10) / 10),
-              fiber: Math.max(0, Math.round((item.fiber || 0) * scale * 10) / 10),
-            };
+            scaled = scaleMacrosByQuantity(item, quantity, item.unit, baseQty, baseUnit, item.name);
           } catch (err) {
             console.error('Scale error:', err);
           }
