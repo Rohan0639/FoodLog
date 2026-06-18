@@ -1,4 +1,4 @@
-import { GeminiResponse } from './types';
+import { GeminiResponse } from '../../shared/types';
 
 const cache = new Map<string, GeminiResponse>();
 

@@ -11,6 +11,6 @@
     "outDir": ".vercel/output",
     "rootDir": "."
   },
-  "include": ["api/**/*", "lib/**/*"],
+  "include": ["api/**/*", "backend/**/*", "shared/**/*", "config/**/*"],
   "exclude": ["node_modules", "frontend"]
 }

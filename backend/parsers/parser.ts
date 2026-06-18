@@ -1,5 +1,5 @@
-import { GeminiResponse, ParsedItem } from './types';
-import { normalizeFoodInput } from './normalize';
+import { GeminiResponse, ParsedItem } from '../../shared/types';
+import { normalizeFoodInput } from '../../shared/normalize';
 
 interface FoodDefinition {
   name: string;

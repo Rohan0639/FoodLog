@@ -1,8 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getCache, setCache } from '../lib/cache';
-import { parseFoodRules } from '../lib/parser';
-import { callGemini } from '../lib/gemini';
-import { normalizeFoodInput } from '../lib/normalize';
+import { getCache, setCache } from '../backend/services/cache';
+import { parseFoodOrchestrator } from '../backend/parsers';
+import { normalizeFoodInput } from '../shared/normalize';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Set CORS headers
@@ -43,22 +42,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json(cachedResult);
     }
 
-    // 2. Try rule-based parser
-    const ruleResult = parseFoodRules(normalizedText);
-    if (ruleResult) {
-      console.log(`[Rule Parser Hit] key: "${normalizedText}"`);
-      setCache(normalizedText, ruleResult);
-      return res.status(200).json(ruleResult);
-    }
+    // 2. Parse food via orchestrator (rules-based first, falling back to Gemini)
+    const parseResult = await parseFoodOrchestrator(normalizedText);
 
-    // 3. Call Gemini
-    console.log(`[LLM Parser Request] key: "${normalizedText}"`);
-    const geminiResult = await callGemini(normalizedText);
+    // 3. Save to cache
+    setCache(normalizedText, parseResult);
 
-    // 4. Save to cache
-    setCache(normalizedText, geminiResult);
-
-    return res.status(200).json(geminiResult);
+    return res.status(200).json(parseResult);
   } catch (error: any) {
     console.error('[API Error]', error);
     return res.status(500).json({

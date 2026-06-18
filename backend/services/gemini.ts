@@ -1,9 +1,9 @@
-import { GeminiResponse } from './types';
-import { normalizeFoodInput } from './normalize';
-import { validateGeminiResponse } from './validator';
+import { GeminiResponse } from '../../shared/types';
+import { normalizeFoodInput } from '../../shared/normalize';
+import { validateGeminiResponse } from '../utils/validator';
+import { GEMINI_CONFIG } from '../../config';
 
-const MODEL_NAME = 'gemini-1.5-flash';
-const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent`;
+const GEMINI_API_URL = GEMINI_CONFIG.API_URL;
 
 export async function callGemini(foodText: string): Promise<GeminiResponse> {
   const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
