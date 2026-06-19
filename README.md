@@ -45,22 +45,7 @@ Open [http://localhost:3000](http://localhost:3000) (or the port Vercel dev prov
 
 ---
 
-## Folder Structure
 
-```
-foodlog/
-├── frontend/
-│   ├── src/
-│   │   ├── auth/          # Login & Signup pages
-│   │   ├── components/    # Navbar, ChatMessage, NutritionDashboard, …
-│   │   ├── pages/         # Dashboard (main app page)
-│   │   ├── utils/         # Gemini parser, unit converter
-│   │   ├── lib/           # Supabase client
-│   │   └── types.ts       # Shared TypeScript types
-│   └── index.html
-├── vercel.json
-└── package.json
-```
 
 ---
 
