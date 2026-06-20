@@ -6,15 +6,6 @@ Designed to simplify daily diet logging through natural language processing. Ins
 
 
 
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Frontend | React 18 + TypeScript + Vite |
-| Styling | Tailwind CSS |
-| AI | Google Gemini API |
-| Database & Auth | Supabase (PostgreSQL + RLS) |
-| Deployment | Vercel |
 
 ---
 
