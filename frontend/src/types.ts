@@ -12,6 +12,7 @@ export interface FoodItem {
   createdAt: string;
   baseQuantity?: number;
   baseUnit?: string;
+  brand?: string | null;
 }
 
 export interface FoodEntry {
@@ -31,6 +32,7 @@ export interface FoodEntry {
   baseQuantity?: number;
   baseUnit?: string;
   baseFoodName?: string;
+  brand?: string | null;
   caloriesPerUnit?: number;
   proteinPerUnit?: number;
   carbsPerUnit?: number;
@@ -50,6 +52,8 @@ export interface ParsedItem {
   sugar: number;
   fiber: number;
   baseFoodName?: string;
+  baseName?: string;
+  brand?: string | null;
   baseUnit?: string;
   baseQty?: number;
   caloriesPerUnit?: number;

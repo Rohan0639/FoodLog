@@ -92,10 +92,13 @@ const FOOD_DATABASE: FoodDefinition[] = [
   }
 ];
 
-// Split input by "and", ",", "+", or "with"
+// Split input by "and", ",", or "+"
+// NOTE: "with" is intentionally NOT a splitter — it often describes a single
+// composite dish (e.g. "burger with cheese", "rice with dal"). Gemini handles
+// the semantic separation when needed.
 function splitIngredients(text: string): string[] {
   return text
-    .split(/\band\b|,|\+|\bwith\b/i)
+    .split(/\band\b|,|\+/i)
     .map(p => p.trim())
     .filter(p => p.length > 0);
 }
@@ -123,6 +126,15 @@ function parseIngredientPart(part: string, database: FoodDefinition[] = FOOD_DAT
   }
   
   if (!matchedFood) {
+    return null;
+  }
+
+  // Coverage-based confidence gate:
+  // If the matched alias covers less than 50% of the input phrase, the match
+  // is likely a greedy substring hit (e.g. "rice" inside "KFC rice bowl").
+  // Return null to fall through to the LLM for a more accurate parse.
+  const matchCoverage = matchedAlias.length / clean.length;
+  if (matchCoverage < 0.5) {
     return null;
   }
   

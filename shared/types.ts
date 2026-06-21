@@ -8,6 +8,8 @@ export interface ParsedItem {
   sugar: number;
   fiber: number;
   baseFoodName?: string;
+  baseName?: string;
+  brand?: string | null;
   baseUnit?: string;
   baseQty?: number;
   caloriesPerUnit?: number;

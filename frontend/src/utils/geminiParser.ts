@@ -161,33 +161,59 @@ export async function analyzeFoodClient(foodText: string): Promise<GeminiRespons
 
   const normalizedInput = normalizeFoodInput(foodText);
 
-  const prompt = `You are a strict food recognition and calorie estimation assistant.
+  const prompt = `You are an advanced food parsing and nutrition extraction engine.
 
-Step 1: Validate the input.
-- Check if the user input describes real, edible food or drink.
-- If the input is not food (e.g., objects, people, jokes, unrealistic items like "my friend", "stone", "car", etc.), DO NOT estimate calories.
+Your task is to convert natural language food input into accurate structured food items with correct quantities and realistic nutritional values.
 
-Step 2: If invalid:
-- Respond ONLY with:
+## CRITICAL RULES
+
+1. NEVER oversimplify food items.
+   - "KFC rice bowl" must NOT become "rice"
+   - "peri peri chicken strips" must NOT become "chicken breast"
+   - Preserve brand, preparation style, and dish type in the name
+
+2. Treat multi-word foods as SINGLE entities when appropriate.
+   - "fried rice", "rice bowl", "chicken strips", "burger", "pizza slice"
+
+3. Detect brand and restaurant foods.
+   - KFC, McDonald's, Domino's, Subway, etc.
+   - These are COMPOSITE FOODS → estimate realistic macros for the whole dish
+
+4. Handle quantities correctly:
+   - Extract numbers (300g, 2 pieces, 1 cup, etc.)
+   - Normalize units: g, ml, piece, slice, serving
+
+5. If weight is given (like 300g):
+   - Calculate nutrition proportionally based on weight
+   - Do NOT ignore weight
+
+6. If food is complex or branded:
+   - Estimate macros based on real-world nutritional data
+   - DO NOT fallback to generic base ingredients
+
+7. Split multiple items on "and", ",", "+" only.
+   - DO NOT split on "with" if it describes a single dish (e.g. "burger with cheese" is ONE item)
+
+## INPUT VALIDATION
+
+First, check if the input describes real, edible food or drink.
+If the input is not food (e.g., objects, people, jokes, unrealistic items like "my friend", "stone", "car"), respond ONLY with:
 {
   "status": "invalid",
   "reason": "Input is not a valid food item"
 }
 
-Step 3: If valid:
-- Extract food items and estimate realistic calorie values.
-- Avoid extreme or unrealistic calorie values.
+## OUTPUT FORMAT (for valid food)
 
-Respond ONLY in JSON format.
+Respond ONLY in JSON format. No explanation.
 
-Valid response format:
 {
   "status": "valid",
-  "reply": "A friendly confirmation or response message summarizing the food and macros, and maybe a helpful tip.",
+  "reply": "A friendly confirmation summarizing the food items and a helpful tip.",
   "items": [
     {
-      "name": "food name",
-      "quantity": "string quantity description (e.g. 1 apple, 100g, etc.)",
+      "name": "full food name (preserve brand and preparation)",
+      "quantity": "string quantity description (e.g. '1 serving', '300g', '2 pieces')",
       "calories": number,
       "protein": number,
       "carbs": number,

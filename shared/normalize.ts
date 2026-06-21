@@ -6,6 +6,8 @@ export function normalizeFoodInput(text: string): string {
     .replace(/\bgms\b/gi, 'grams')
     .replace(/\bgm\b/gi, 'grams')
     .replace(/\bg\b/gi, 'grams')
+    .replace(/\bkgs?\b/gi, 'kilograms')
     .replace(/\bml\b/gi, 'ml')
-    .replace(/\bl\b/gi, 'liters');
+    .replace(/\bl\b/gi, 'liters')
+    .replace(/\bpcs?\b/gi, 'pieces');
 }
