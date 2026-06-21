@@ -45,7 +45,17 @@ Valid response format:
       "carbs": number,
       "fat": number,
       "sugar": number,
-      "fiber": number
+      "fiber": number,
+      "baseFoodName": "base food item name (singular, lowercase, e.g. 'pizza', 'banana', 'sushi')",
+      "baseUnit": "base unit of lookup (e.g. 'slice', 'piece', 'grams', 'ml')",
+      "baseQty": number (the base quantity e.g. 1 for slice/piece/serving, or 100 for grams/ml),
+      "caloriesPerUnit": number (macros per single unit or per 100g/100ml, corresponding to baseQty),
+      "proteinPerUnit": number,
+      "carbsPerUnit": number,
+      "fatPerUnit": number,
+      "sugarPerUnit": number,
+      "fiberPerUnit": number,
+      "aliases": ["array of common string aliases, e.g. ['sushi', 'sushi roll', 'sushi rolls']"]
     }
   ],
   "totals": {

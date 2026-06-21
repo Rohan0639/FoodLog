@@ -560,7 +560,15 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
           fats: item.fat || 0,
           sugar: item.sugar || 0,
           fiber: item.fiber || 0,
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
+          baseFoodName: item.baseFoodName,
+          caloriesPerUnit: item.caloriesPerUnit,
+          proteinPerUnit: item.proteinPerUnit,
+          carbsPerUnit: item.carbsPerUnit,
+          fatPerUnit: item.fatPerUnit,
+          sugarPerUnit: item.sugarPerUnit,
+          fiberPerUnit: item.fiberPerUnit,
+          aliases: item.aliases
         };
       });
       const replyText = parseData.reply || `Please review the parsed food items:`;
@@ -698,6 +706,37 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
       if (error) {
         throw new Error(`Supabase batch save error: ${error.message}`);
       }
+
+      // Asynchronously upsert any newly learned base foods into macro_dictionary cache
+      (async () => {
+        for (const item of activeFoods) {
+          if (item.baseFoodName && item.baseUnit && typeof item.caloriesPerUnit === 'number') {
+            try {
+              const { error: dictError } = await supabase
+                .from('macro_dictionary')
+                .upsert({
+                  food_name: item.baseFoodName,
+                  base_unit: item.baseUnit,
+                  calories_per_unit: item.caloriesPerUnit,
+                  protein_per_unit: item.proteinPerUnit ?? 0,
+                  carbs_per_unit: item.carbsPerUnit ?? 0,
+                  fat_per_unit: item.fatPerUnit ?? 0,
+                  sugar_per_unit: item.sugarPerUnit ?? 0,
+                  fiber_per_unit: item.fiberPerUnit ?? 0,
+                  aliases: item.aliases || [item.baseFoodName]
+                }, { onConflict: 'food_name,base_unit' });
+
+              if (dictError) {
+                console.warn(`[Cache Database Write Warning] Failed to insert "${item.baseFoodName}" to macro_dictionary:`, dictError.message);
+              } else {
+                console.log(`[Cache Learned] Successfully added "${item.baseFoodName}" to macro_dictionary.`);
+              }
+            } catch (dbErr) {
+              console.warn('[Cache Database Write Error]', dbErr);
+            }
+          }
+        }
+      })();
 
       const mappedSaved = (savedEntries || []).map((item: any) => ({
         id: item.id,

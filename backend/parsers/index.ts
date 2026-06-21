@@ -1,6 +1,7 @@
 import { GeminiResponse } from '../../shared/types';
 import { parseFoodRules } from './parser';
 import { callGemini } from '../services/gemini';
+import { supabase } from '../services/supabaseClient';
 
 /**
  * Orchestrates food parsing logic.
@@ -8,7 +9,7 @@ import { callGemini } from '../services/gemini';
  */
 export async function parseFoodOrchestrator(normalizedText: string): Promise<GeminiResponse> {
   // 1. Try rule-based parser
-  const ruleResult = parseFoodRules(normalizedText);
+  const ruleResult = await parseFoodRules(normalizedText);
   if (ruleResult) {
     console.log(`[Rule Parser Hit] key: "${normalizedText}"`);
     return ruleResult;
@@ -17,5 +18,6 @@ export async function parseFoodOrchestrator(normalizedText: string): Promise<Gem
   // 2. Call Gemini
   console.log(`[LLM Parser Request] key: "${normalizedText}"`);
   const geminiResult = await callGemini(normalizedText);
+
   return geminiResult;
 }
