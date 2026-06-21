@@ -30,6 +30,14 @@ export interface FoodEntry {
   isOfflineUpdated?: boolean;
   baseQuantity?: number;
   baseUnit?: string;
+  baseFoodName?: string;
+  caloriesPerUnit?: number;
+  proteinPerUnit?: number;
+  carbsPerUnit?: number;
+  fatPerUnit?: number;
+  sugarPerUnit?: number;
+  fiberPerUnit?: number;
+  aliases?: string[];
 }
 
 export interface ParsedItem {
@@ -41,6 +49,16 @@ export interface ParsedItem {
   fat: number;
   sugar: number;
   fiber: number;
+  baseFoodName?: string;
+  baseUnit?: string;
+  baseQty?: number;
+  caloriesPerUnit?: number;
+  proteinPerUnit?: number;
+  carbsPerUnit?: number;
+  fatPerUnit?: number;
+  sugarPerUnit?: number;
+  fiberPerUnit?: number;
+  aliases?: string[];
 }
 
 export interface ParsedTotals {

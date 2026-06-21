@@ -1,5 +1,6 @@
 import { GeminiResponse, ParsedItem } from '../../shared/types';
 import { normalizeFoodInput } from '../../shared/normalize';
+import { supabase } from '../services/supabaseClient';
 
 interface FoodDefinition {
   name: string;
@@ -100,14 +101,14 @@ function splitIngredients(text: string): string[] {
 }
 
 // Parse a single ingredient part
-function parseIngredientPart(part: string): ParsedItem | null {
+function parseIngredientPart(part: string, database: FoodDefinition[] = FOOD_DATABASE): ParsedItem | null {
   const clean = part.toLowerCase().trim();
   
   // Try to find matching food definition
   let matchedFood: FoodDefinition | null = null;
   let matchedAlias = '';
   
-  for (const food of FOOD_DATABASE) {
+  for (const food of database) {
     for (const alias of food.aliases) {
       // Look for alias matching as a full word boundary or surrounded by spaces/ends
       const regex = new RegExp(`\\b${alias}\\b`, 'i');
@@ -201,9 +202,36 @@ function parseIngredientPart(part: string): ParsedItem | null {
   };
 }
 
-export function parseFoodRules(text: string): GeminiResponse | null {
+export async function parseFoodRules(text: string): Promise<GeminiResponse | null> {
   const normalized = normalizeFoodInput(text);
   if (!normalized) return null;
+  
+  let dbFoods: FoodDefinition[] = [];
+  try {
+    const { data, error } = await supabase
+      .from('macro_dictionary')
+      .select('*');
+
+    if (!error && data) {
+      dbFoods = data.map((row: any) => ({
+        name: row.food_name,
+        unit: row.base_unit,
+        caloriesPerUnit: row.calories_per_unit,
+        proteinPerUnit: row.protein_per_unit,
+        carbsPerUnit: row.carbs_per_unit,
+        fatPerUnit: row.fat_per_unit,
+        sugarPerUnit: row.sugar_per_unit,
+        fiberPerUnit: row.fiber_per_unit,
+        aliases: row.aliases || [],
+        defaultQty: row.base_unit === 'grams' || row.base_unit === 'ml' ? 100 : 1,
+        isLiquid: row.base_unit === 'ml'
+      }));
+    }
+  } catch (err) {
+    console.warn('[Cache Database Read Warning]', err);
+  }
+
+  const combinedDatabase = [...dbFoods, ...FOOD_DATABASE];
   
   const parts = splitIngredients(normalized);
   if (parts.length === 0) return null;
@@ -211,7 +239,7 @@ export function parseFoodRules(text: string): GeminiResponse | null {
   const items: ParsedItem[] = [];
   
   for (const part of parts) {
-    const item = parseIngredientPart(part);
+    const item = parseIngredientPart(part, combinedDatabase);
     if (!item) {
       // If any ingredient fails to parse via rules, fall back to LLM
       return null;
