@@ -70,14 +70,30 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ user, onLogout }: DashboardProps) {
-  const [messages, setMessages] = useState<Message[]>([
-    {
+  const [messages, setMessages] = useState<Message[]>(() => {
+    const todayStr = getTodayDate();
+    const welcome: Message = {
       id: 'welcome',
       sender: 'bot',
       text: "Hello! I'm your digital food diary assistant. Tell me what you ate today (e.g., \"I had 2 bananas and 3 eggs\") and I'll analyze and log the nutrients for you.",
       timestamp: new Date(),
-    },
-  ]);
+    };
+    try {
+      const saved = localStorage.getItem(`chat_messages_${user.id}_${todayStr}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((m: any) => ({
+            ...m,
+            timestamp: new Date(m.timestamp)
+          }));
+        }
+      }
+    } catch (e) {
+      console.error('Failed to parse cached chat messages', e);
+    }
+    return [welcome];
+  });
   const [logs, setLogs] = useState<FoodEntry[]>([]);
   const [dailyGoal] = useState<DailyGoal>(DEFAULT_DAILY_GOAL);
   const [todayDateStr, setTodayDateStr] = useState<string>(getTodayDate());
@@ -86,8 +102,42 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
   const [isBotTyping, setIsBotTyping] = useState(false);
   const [isDashboardOpenMobile, setIsDashboardOpenMobile] = useState(false);
 
-  const [activeFoods, setActiveFoods] = useState<FoodEntry[]>([]);
-  const [activeReviewMessageId, setActiveReviewMessageId] = useState<string | null>(null);
+  const [activeFoods, setActiveFoods] = useState<FoodEntry[]>(() => {
+    const todayStr = getTodayDate();
+    try {
+      const saved = localStorage.getItem(`chat_messages_${user.id}_${todayStr}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          const pendingMsg = parsed.find((m: any) => m.pendingFoods && m.pendingFoods.length > 0);
+          if (pendingMsg && pendingMsg.pendingFoods) {
+            return pendingMsg.pendingFoods;
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Failed to parse active foods from cache', e);
+    }
+    return [];
+  });
+  const [activeReviewMessageId, setActiveReviewMessageId] = useState<string | null>(() => {
+    const todayStr = getTodayDate();
+    try {
+      const saved = localStorage.getItem(`chat_messages_${user.id}_${todayStr}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          const pendingMsg = parsed.find((m: any) => m.pendingFoods && m.pendingFoods.length > 0);
+          if (pendingMsg) {
+            return pendingMsg.id;
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Failed to parse active review message ID from cache', e);
+    }
+    return null;
+  });
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -99,6 +149,30 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
   useEffect(() => {
     scrollToBottom();
   }, [messages, isBotTyping]);
+
+  // Clean up old days' chat history for the user to keep localStorage clean
+  useEffect(() => {
+    const todayStr = getTodayDate();
+    const prefix = `chat_messages_${user.id}_`;
+    try {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(prefix) && key !== `${prefix}${todayStr}`) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach((key) => localStorage.removeItem(key));
+    } catch (e) {
+      console.warn('Failed to clean up old chat logs from localStorage:', e);
+    }
+  }, [user.id]);
+
+  // Save messages to localStorage whenever they change
+  useEffect(() => {
+    const todayStr = getTodayDate();
+    localStorage.setItem(`chat_messages_${user.id}_${todayStr}`, JSON.stringify(messages));
+  }, [messages, user.id]);
 
   // Load logs from Supabase on start
   useEffect(() => {
@@ -175,13 +249,19 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
     };
 
     const handleMidnightReset = async () => {
+      const welcome: Message = {
+        id: 'welcome',
+        sender: 'bot',
+        text: "Hello! I'm your digital food diary assistant. Tell me what you ate today (e.g., \"I had 2 bananas and 3 eggs\") and I'll analyze and log the nutrients for you.",
+        timestamp: new Date(),
+      };
       const resetMessage: Message = {
         id: `bot-midnight-reset-${Date.now()}`,
         sender: 'bot',
         text: "Midnight reached! A new logging day has started. ☀️ Your previous logs are saved in history.",
         timestamp: new Date(),
       };
-      setMessages((prev) => [...prev, resetMessage]);
+      setMessages([welcome, resetMessage]);
 
       const todayStr = getTodayDate();
       setTodayDateStr(todayStr);
