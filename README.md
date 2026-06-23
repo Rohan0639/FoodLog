@@ -26,7 +26,6 @@ How it works:
 
 • Works completely offline, syncing automatically when you get back on the grid
 
-----------------------------------------------------------------------------------------------------------------------------------------------------
 
 
 
