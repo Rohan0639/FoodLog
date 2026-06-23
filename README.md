@@ -30,7 +30,6 @@ How it works:
 
 
 
-Built with React, TypeScript, Tailwind CSS, Supabase, and Google's Gemini API, the app focuses on speed, responsiveness, and clean UI design.
 
 
 
