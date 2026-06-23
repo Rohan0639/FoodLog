@@ -1,6 +1,5 @@
 # FoodLog
 
--------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 tracking calories and macros is a chore. Typing in search bars, adjusting sliders, and choosing from five different database entries for a single apple gets old fast.
 
