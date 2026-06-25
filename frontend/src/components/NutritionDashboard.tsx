@@ -634,6 +634,7 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
               totalSugar={selectedDateLog?.totalSugar || 0}
               totalFiber={selectedDateLog?.totalFiber || 0}
               onDeleteEntry={handleDeleteHistoryEntry}
+              onSelectDate={setSelectedDate}
               isLoading={isHistoryLoading}
             />
           </div>

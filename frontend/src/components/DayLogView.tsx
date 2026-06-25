@@ -1,6 +1,6 @@
 import React from 'react';
 import type { FoodEntry } from '../types';
-import { Target } from 'lucide-react';
+import { Target, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface DayLogViewProps {
   dateString: string;
@@ -12,6 +12,7 @@ interface DayLogViewProps {
   totalSugar: number;
   totalFiber: number;
   onDeleteEntry: (id: string) => void;
+  onSelectDate?: (date: string) => void;
   isLoading?: boolean;
 }
 
@@ -26,6 +27,7 @@ export const DayLogView: React.FC<DayLogViewProps> = ({
   totalFiber,
   // onDeleteEntry is kept in the interface for backwards compatibility but not used in read-only view
   onDeleteEntry: _onDeleteEntry,
+  onSelectDate,
   isLoading = false,
 }) => {
   // Formats selected date string to readable text (e.g., 21 June 2026)
@@ -52,11 +54,43 @@ export const DayLogView: React.FC<DayLogViewProps> = ({
 
   return (
     <div className="w-full space-y-4 font-sans text-white">
-      {/* Date Header Title */}
-      <div className="flex justify-between items-baseline px-1">
+      {/* Date Header Title with Prev/Next Navigation */}
+      <div className="flex justify-between items-center px-1">
         <h4 className="text-xs font-black tracking-widest text-zinc-500 uppercase font-mono">
           Logs for {formatReadableDate(dateString)}
         </h4>
+        {onSelectDate && (
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => {
+                const d = new Date(dateString + 'T00:00:00');
+                d.setDate(d.getDate() - 1);
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                onSelectDate(`${y}-${m}-${day}`);
+              }}
+              className="p-1 rounded-lg border border-zinc-900 bg-zinc-950 text-zinc-400 hover:text-white transition-all duration-150 active:scale-95"
+              title="Previous day"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => {
+                const d = new Date(dateString + 'T00:00:00');
+                d.setDate(d.getDate() + 1);
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                onSelectDate(`${y}-${m}-${day}`);
+              }}
+              className="p-1 rounded-lg border border-zinc-900 bg-zinc-950 text-zinc-400 hover:text-white transition-all duration-150 active:scale-95"
+              title="Next day"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
       </div>
 
       {isLoading ? (
