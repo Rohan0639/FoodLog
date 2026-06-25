@@ -109,7 +109,10 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
 
   // Fetch individual day food entries YYYY-MM-DD
   const fetchDateLogs = async (date: string) => {
-    setIsHistoryLoading(true);
+    // Only show loading spinner on the very first load, not on day-to-day navigation
+    if (!selectedDateLog) {
+      setIsHistoryLoading(true);
+    }
     try {
       const { data, error } = await supabase
         .from('food_logs')

@@ -17,6 +17,17 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const today = new Date();
   const [currentDate, setCurrentDate] = useState<Date>(new Date(selectedDate));
 
+  // Sync displayed month when selectedDate moves to a different month (e.g. via day arrows)
+  useEffect(() => {
+    const selected = new Date(selectedDate + 'T00:00:00');
+    if (
+      selected.getFullYear() !== currentDate.getFullYear() ||
+      selected.getMonth() !== currentDate.getMonth()
+    ) {
+      setCurrentDate(new Date(selected.getFullYear(), selected.getMonth(), 1));
+    }
+  }, [selectedDate]);
+
   useEffect(() => {
     // Notify parent of initial month
     const year = currentDate.getFullYear();
