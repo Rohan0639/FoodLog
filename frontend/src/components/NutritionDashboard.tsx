@@ -115,7 +115,7 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
         .from('food_logs')
         .select('*')
         .eq('date', date)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: true });
 
       if (error) throw error;
 
