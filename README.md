@@ -17,15 +17,15 @@ Instead of clicking through forms or searching the food item , you just tell the
 How it works:
 
 
-• Parses the text into individual food items
+• Parses the text into individual food items.
 
-• Estimates realistic calories, protein, carbs, fats, fiber, and sugar
+• Estimates realistic calories, protein, carbs, fats, fiber, and sugar.
 
-• Displays your daily progress with smooth, responsive dashboards
+• Displays your daily progress with smooth, responsive dashboards.
 
-• Allows you to review and fine-tune portions inline before confirming
+• Allows you to review and fine-tune portions inline before confirming.
 
-• Works completely offline, syncing automatically when you get back on the grid
+• Works completely offline, syncing automatically when you get back on the grid.
 
 ---------------------------------------------------------------------------------------------------------------------------------------------------
 
