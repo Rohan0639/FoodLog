@@ -109,13 +109,16 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
 
   // Fetch individual day food entries YYYY-MM-DD
   const fetchDateLogs = async (date: string) => {
-    setIsHistoryLoading(true);
+    // Only show loading spinner on the very first load, not on day-to-day navigation
+    if (!selectedDateLog) {
+      setIsHistoryLoading(true);
+    }
     try {
       const { data, error } = await supabase
         .from('food_logs')
         .select('*')
         .eq('date', date)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: true });
 
       if (error) throw error;
 
@@ -634,6 +637,7 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
               totalSugar={selectedDateLog?.totalSugar || 0}
               totalFiber={selectedDateLog?.totalFiber || 0}
               onDeleteEntry={handleDeleteHistoryEntry}
+              onSelectDate={setSelectedDate}
               isLoading={isHistoryLoading}
             />
           </div>
