@@ -984,6 +984,9 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
   };
 
   const handleClearAll = async () => {
+    const confirmClear = window.confirm("Are you sure you want to clear all logged food items for today?");
+    if (!confirmClear) return;
+
     const todayStr = getTodayDate();
     setLogs([]);
 

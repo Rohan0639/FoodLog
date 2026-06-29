@@ -40,6 +40,9 @@ export default function App() {
   }, []);
 
   const handleLogout = async () => {
+    const confirmLogout = window.confirm("Are you sure you want to sign out?");
+    if (!confirmLogout) return;
+
     try {
       await supabase.auth.signOut();
       setUser(null);
