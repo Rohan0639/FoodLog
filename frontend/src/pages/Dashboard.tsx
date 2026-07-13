@@ -10,6 +10,7 @@ const USE_BACKEND = true;
 import Navbar from '../components/Navbar';
 import FoodLogger from '../components/FoodLogger';
 import { NutritionDashboard } from '../components/NutritionDashboard';
+import { MessageCircle, BarChart2 } from 'lucide-react';
 import type { User } from '@supabase/supabase-js';
 
 const DEFAULT_DAILY_GOAL: DailyGoal = {
@@ -100,7 +101,8 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
   const [isOnline, setIsOnline] = useState<boolean | null>(null); // null = checking
 
   const [isBotTyping, setIsBotTyping] = useState(false);
-  const [isDashboardOpenMobile, setIsDashboardOpenMobile] = useState(false);
+  // Mobile app-style navigation: 'log' = chat screen, 'progress' = stats/history screen
+  const [mobileTab, setMobileTab] = useState<'log' | 'progress'>('log');
 
   const [activeFoods, setActiveFoods] = useState<FoodEntry[]>(() => {
     const todayStr = getTodayDate();
@@ -1014,36 +1016,37 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
   };
 
   return (
-    <div className="flex flex-col w-full overflow-hidden bg-black text-white" style={{ height: '100dvh' }}>
+    <div className="flex flex-col w-full overflow-hidden bg-zinc-950 text-zinc-100" style={{ height: '100dvh' }}>
       {/* Navbar */}
       <Navbar
         userEmail={user.email}
         isOnline={isOnline}
         onLogout={onLogout}
-        isDashboardOpenMobile={isDashboardOpenMobile}
-        setIsDashboardOpenMobile={setIsDashboardOpenMobile}
-        hasLogs={logs.length > 0}
       />
 
       <div className="flex-1 flex flex-row overflow-hidden relative min-h-0">
-        {/* Left Logger Column */}
-        <FoodLogger
-          messages={messages}
-          logs={logs}
-          activeReviewMessageId={activeReviewMessageId}
-          activeFoods={activeFoods}
-          setActiveFoods={setActiveFoods}
-          isBotTyping={isBotTyping}
-          onSendMessage={handleSendMessage}
-          onConfirmLog={handleConfirmLog}
-          onDiscard={handleDiscard}
-          messagesEndRef={messagesEndRef}
-        />
+        {/* Chat / Log screen — always visible on desktop; on mobile only when 'log' tab is active */}
+        <div className={`flex-1 min-w-0 min-h-0 flex-col animate-view-in ${mobileTab === 'log' ? 'flex' : 'hidden lg:flex'}`}>
+          <FoodLogger
+            messages={messages}
+            logs={logs}
+            activeReviewMessageId={activeReviewMessageId}
+            activeFoods={activeFoods}
+            setActiveFoods={setActiveFoods}
+            isBotTyping={isBotTyping}
+            onSendMessage={handleSendMessage}
+            onConfirmLog={handleConfirmLog}
+            onDiscard={handleDiscard}
+            messagesEndRef={messagesEndRef}
+          />
+        </div>
 
-        {/* Desktop Dashboard panel — fluid width, never overflows */}
+        {/* Progress screen — side panel on desktop; full-screen tab view on mobile.
+            One shared instance so data fetches are never duplicated. */}
         <div
-          className="hidden lg:flex h-full shrink-0 flex-col"
-          style={{ width: 'clamp(280px, 28vw, 360px)' }}
+          className={`h-full min-h-0 flex-col animate-view-in ${
+            mobileTab === 'progress' ? 'flex w-full' : 'hidden'
+          } lg:flex lg:w-[clamp(280px,28vw,360px)] lg:shrink-0`}
         >
           <NutritionDashboard
             key={todayDateStr}
@@ -1054,34 +1057,39 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
             onClearAll={handleClearAll}
           />
         </div>
-
-        {/* Mobile Drawer Slide-over Panel */}
-        {isDashboardOpenMobile && (
-          <div className="lg:hidden fixed inset-0 z-50 flex justify-end">
-            {/* Backdrop */}
-            <div
-              onClick={() => setIsDashboardOpenMobile(false)}
-              className="absolute inset-0 bg-black/85 backdrop-blur-sm"
-            />
-
-            {/* Panel — capped at 85vw so it never fills entire narrow screen */}
-            <div
-              className="relative h-full bg-black border-l border-zinc-900 shadow-2xl flex flex-col drawer-enter overflow-hidden"
-              style={{ width: 'min(85vw, 360px)' }}
-            >
-              <NutritionDashboard
-                key={todayDateStr}
-                logs={logs}
-                dailyGoal={dailyGoal}
-                onDeleteFoodLog={handleDeleteFoodEntry}
-                onUpdateFoodLog={handleUpdateFoodEntry}
-                onClearAll={handleClearAll}
-                onCloseMobile={() => setIsDashboardOpenMobile(false)}
-              />
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* Mobile bottom tab bar — native-app navigation */}
+      <nav
+        className="lg:hidden glass border-t border-zinc-800/80 shrink-0 z-30 flex items-stretch"
+        style={{ height: 'var(--tabbar-h)', paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        <button
+          onClick={() => setMobileTab('log')}
+          className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors duration-150 ${
+            mobileTab === 'log' ? 'text-white' : 'text-zinc-500'
+          }`}
+        >
+          <div className={`px-4 py-1 rounded-full transition-colors duration-150 ${mobileTab === 'log' ? 'bg-zinc-800' : ''}`}>
+            <MessageCircle className="w-5 h-5" />
+          </div>
+          <span className="text-[10px] font-semibold">Log</span>
+        </button>
+        <button
+          onClick={() => setMobileTab('progress')}
+          className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors duration-150 ${
+            mobileTab === 'progress' ? 'text-white' : 'text-zinc-500'
+          }`}
+        >
+          <div className={`relative px-4 py-1 rounded-full transition-colors duration-150 ${mobileTab === 'progress' ? 'bg-zinc-800' : ''}`}>
+            <BarChart2 className="w-5 h-5" />
+            {logs.length > 0 && mobileTab !== 'progress' && (
+              <span className="absolute top-0.5 right-2.5 w-1.5 h-1.5 rounded-full bg-white" />
+            )}
+          </div>
+          <span className="text-[10px] font-semibold">Progress</span>
+        </button>
+      </nav>
     </div>
   );
 }

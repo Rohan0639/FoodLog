@@ -79,11 +79,11 @@ export const ReviewConfirmTable: React.FC<ReviewConfirmTableProps> = ({
   );
 
   return (
-    <div className="w-full mt-2 rounded-2xl bg-zinc-950 border border-zinc-800 p-2.5 sm:p-4 space-y-3 sm:space-y-4 shadow-xl animate-fade-in text-white font-sans max-w-lg">
+    <div className="w-full mt-2 rounded-2xl bg-zinc-900 border border-zinc-800 p-3 sm:p-4 space-y-3 sm:space-y-4 shadow-soft-md animate-fade-in text-zinc-100 font-sans max-w-lg">
       {/* Title Header */}
-      <div className="pb-2.5 border-b border-zinc-900 flex flex-col gap-1">
-        <span className="text-xs font-black tracking-widest text-[#FF7E67] uppercase font-sans">
-          REVIEW ESTIMATES
+      <div className="pb-2.5 border-b border-zinc-800 flex flex-col gap-1">
+        <span className="text-xs font-bold text-white uppercase tracking-wider font-sans">
+          Review estimates
         </span>
       </div>
 
@@ -98,7 +98,7 @@ export const ReviewConfirmTable: React.FC<ReviewConfirmTableProps> = ({
             {foods.map((food) => {
               const scaled = getScaledMacros(food);
               return (
-                <div key={food.id} className="p-3 bg-zinc-900/40 border border-zinc-800 rounded-xl space-y-2 relative">
+                <div key={food.id} className="p-3 bg-zinc-950/70 border border-zinc-800 rounded-xl space-y-2 relative">
                   <div className="flex justify-between items-start">
                     <span className="font-semibold text-zinc-200 capitalize truncate pr-6 text-xs" title={food.name}>
                       {food.name}
@@ -107,7 +107,7 @@ export const ReviewConfirmTable: React.FC<ReviewConfirmTableProps> = ({
                       type="button"
                       disabled={disabled}
                       onClick={() => handleDeleteRow(food.id)}
-                      className="absolute top-2.5 right-2.5 text-zinc-500 hover:text-red-400 hover:bg-zinc-900/50 p-1 rounded-md transition-all duration-150"
+                      className="absolute top-2.5 right-2.5 text-zinc-500 hover:text-white hover:bg-zinc-800 p-1 rounded-md transition-all duration-150"
                       title="Delete item"
                     >
                       <X className="w-4 h-4" />
@@ -122,14 +122,14 @@ export const ReviewConfirmTable: React.FC<ReviewConfirmTableProps> = ({
                         disabled={disabled}
                         value={food.quantity === 0 ? '' : food.quantity}
                         onChange={(e) => handleQtyChange(food.id, e.target.value)}
-                        className="w-11 px-1 py-0.5 text-center bg-zinc-900/60 border border-zinc-800 rounded-lg text-white font-mono focus:outline-none focus:border-zinc-500 disabled:opacity-55 disabled:cursor-not-allowed text-[11px]"
+                        className="w-12 px-1 py-1 text-center bg-zinc-900 border border-zinc-700 rounded-lg text-white num focus:outline-none focus:border-zinc-400 disabled:opacity-55 disabled:cursor-not-allowed text-[11px]"
                         placeholder="0"
                       />
                       <select
                         value={food.unit || 'g'}
                         disabled={disabled}
                         onChange={(e) => handleUnitChange(food.id, e.target.value)}
-                        className="px-1 py-0.5 bg-zinc-900/60 border border-zinc-800 rounded-lg text-white focus:outline-none focus:border-zinc-500 disabled:opacity-55 disabled:cursor-not-allowed text-[11px] cursor-pointer select-arrow pr-3.5"
+                        className="px-1.5 py-1 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-zinc-400 disabled:opacity-55 disabled:cursor-not-allowed text-[11px] cursor-pointer select-arrow pr-3.5"
                       >
                         {food.unit && !['g', 'ml', 'piece', 'cup'].includes(food.unit) && (
                           <option value={food.unit}>{food.unit}</option>
@@ -140,10 +140,10 @@ export const ReviewConfirmTable: React.FC<ReviewConfirmTableProps> = ({
                         <option value="cup">cup</option>
                       </select>
                     </div>
-                    <div className="text-right font-mono">
+                    <div className="text-right num">
                       <div className="text-white font-bold text-[11px]">{scaled.calories} kcal</div>
-                      <div className="text-[8.5px] text-zinc-400 mt-0.5">
-                        P:{scaled.protein}g | C:{scaled.carbs}g | F:{scaled.fats}g | S:{scaled.sugar}g | Fib:{scaled.fiber}g
+                      <div className="text-[9px] text-zinc-400 mt-0.5 font-medium">
+                        P {scaled.protein}g · C {scaled.carbs}g · F {scaled.fats}g · S {scaled.sugar}g · Fib {scaled.fiber}g
                       </div>
                     </div>
                   </div>
@@ -156,20 +156,20 @@ export const ReviewConfirmTable: React.FC<ReviewConfirmTableProps> = ({
           <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-zinc-900 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                <tr className="border-b border-zinc-800 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-zinc-500">
                   <th className="pb-2 font-semibold">Food Item</th>
                   <th className="pb-2 font-semibold pl-2 sm:pl-4">Qty</th>
                   <th className="pb-2 text-right font-semibold">Nutrition Info</th>
                   <th className="pb-2 text-right w-8"></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-900 text-xs">
+              <tbody className="divide-y divide-zinc-800 text-xs">
                 {foods.map((food) => {
                   const scaled = getScaledMacros(food);
                   return (
-                    <tr key={food.id} className="hover:bg-zinc-900/20 transition-colors">
+                    <tr key={food.id} className="hover:bg-zinc-800/40 transition-colors">
                       {/* Food Name */}
-                      <td className="py-2.5 sm:py-3 pr-1 sm:pr-2 font-medium capitalize max-w-[90px] min-[370px]:max-w-[120px] truncate" title={food.name}>
+                      <td className="py-2.5 sm:py-3 pr-1 sm:pr-2 font-semibold text-zinc-200 capitalize max-w-[90px] min-[370px]:max-w-[120px] truncate" title={food.name}>
                         {food.name}
                       </td>
 
@@ -183,14 +183,14 @@ export const ReviewConfirmTable: React.FC<ReviewConfirmTableProps> = ({
                             disabled={disabled}
                             value={food.quantity === 0 ? '' : food.quantity}
                             onChange={(e) => handleQtyChange(food.id, e.target.value)}
-                            className="w-11 min-[370px]:w-14 px-1 sm:px-1.5 py-1 text-center bg-zinc-900/60 border border-zinc-800 rounded-lg text-white font-mono focus:outline-none focus:border-zinc-500 disabled:opacity-55 disabled:cursor-not-allowed text-[11px] sm:text-xs"
+                            className="w-11 min-[370px]:w-14 px-1 sm:px-1.5 py-1 text-center bg-zinc-950 border border-zinc-700 rounded-lg text-white num focus:outline-none focus:border-zinc-400 disabled:opacity-55 disabled:cursor-not-allowed text-[11px] sm:text-xs"
                             placeholder="0"
                           />
                           <select
                             value={food.unit || 'g'}
                             disabled={disabled}
                             onChange={(e) => handleUnitChange(food.id, e.target.value)}
-                            className="px-1 sm:px-1.5 py-1 bg-zinc-900/60 border border-zinc-800 rounded-lg text-white focus:outline-none focus:border-zinc-500 disabled:opacity-55 disabled:cursor-not-allowed text-[11px] sm:text-xs cursor-pointer select-arrow pr-3 min-[370px]:pr-4"
+                            className="px-1 sm:px-1.5 py-1 bg-zinc-950 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-zinc-400 disabled:opacity-55 disabled:cursor-not-allowed text-[11px] sm:text-xs cursor-pointer select-arrow pr-3 min-[370px]:pr-4"
                           >
                             {food.unit && !['g', 'ml', 'piece', 'cup'].includes(food.unit) && (
                               <option value={food.unit}>{food.unit}</option>
@@ -204,10 +204,10 @@ export const ReviewConfirmTable: React.FC<ReviewConfirmTableProps> = ({
                       </td>
 
                       {/* Dynamic Nutrition calculations */}
-                      <td className="py-2.5 sm:py-3 text-right font-mono">
+                      <td className="py-2.5 sm:py-3 text-right num">
                         <div className="text-white font-bold text-[11px] sm:text-xs">{scaled.calories} kcal</div>
-                        <div className="text-[8px] sm:text-[9px] text-zinc-400 mt-0.5">
-                          P:{scaled.protein}g | C:{scaled.carbs}g | F:{scaled.fats}g | S:{scaled.sugar}g | Fib:{scaled.fiber}g
+                        <div className="text-[8.5px] sm:text-[9.5px] text-zinc-400 mt-0.5 font-medium">
+                          P {scaled.protein}g · C {scaled.carbs}g · F {scaled.fats}g · S {scaled.sugar}g · Fib {scaled.fiber}g
                         </div>
                       </td>
 
@@ -217,7 +217,7 @@ export const ReviewConfirmTable: React.FC<ReviewConfirmTableProps> = ({
                           type="button"
                           disabled={disabled}
                           onClick={() => handleDeleteRow(food.id)}
-                          className="text-zinc-500 hover:text-red-400 hover:bg-zinc-900/50 p-1 rounded-md transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation"
+                          className="text-zinc-500 hover:text-white hover:bg-zinc-800 p-1 rounded-md transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation"
                           title="Delete item"
                         >
                           <X className="w-4 h-4" />
@@ -234,40 +234,40 @@ export const ReviewConfirmTable: React.FC<ReviewConfirmTableProps> = ({
 
       {/* Dynamic Summary Row */}
       {foods.length > 0 && (
-        <div className="p-3 bg-zinc-900/40 rounded-xl border border-zinc-900 space-y-1.5">
-          <div className="flex justify-between items-center text-xs font-bold text-zinc-300">
-            <span>Total Estimated Intake</span>
-            <span className="font-mono text-white text-sm">{totals.calories} kcal</span>
+        <div className="p-3 bg-zinc-950/70 rounded-xl border border-zinc-800 space-y-1.5">
+          <div className="flex justify-between items-center text-xs font-bold text-zinc-200">
+            <span>Total estimated intake</span>
+            <span className="num text-white text-sm">{totals.calories} kcal</span>
           </div>
-          <div className="flex flex-wrap justify-between gap-x-2 gap-y-1 text-[10px] text-zinc-400 font-mono pl-0">
-            <span>Protein: <strong className="text-zinc-300 font-semibold">{Math.round(totals.protein * 10) / 10}g</strong></span>
-            <span>Carbs: <strong className="text-zinc-300 font-semibold">{Math.round(totals.carbs * 10) / 10}g</strong></span>
-            <span>Fat: <strong className="text-zinc-300 font-semibold">{Math.round(totals.fats * 10) / 10}g</strong></span>
-            <span>Sugar: <strong className="text-zinc-300 font-semibold">{Math.round(totals.sugar * 10) / 10}g</strong></span>
-            <span>Fiber: <strong className="text-zinc-300 font-semibold">{Math.round(totals.fiber * 10) / 10}g</strong></span>
+          <div className="flex flex-wrap justify-between gap-x-2.5 gap-y-1 text-[10px] text-zinc-500 num pl-0 font-medium">
+            <span>Protein <strong className="text-zinc-300 font-semibold">{Math.round(totals.protein * 10) / 10}g</strong></span>
+            <span>Carbs <strong className="text-zinc-300 font-semibold">{Math.round(totals.carbs * 10) / 10}g</strong></span>
+            <span>Fat <strong className="text-zinc-300 font-semibold">{Math.round(totals.fats * 10) / 10}g</strong></span>
+            <span>Sugar <strong className="text-zinc-300 font-semibold">{Math.round(totals.sugar * 10) / 10}g</strong></span>
+            <span>Fiber <strong className="text-zinc-300 font-semibold">{Math.round(totals.fiber * 10) / 10}g</strong></span>
           </div>
         </div>
       )}
 
       {/* Confirm & Discard CTA Buttons */}
-      <div className="flex gap-2 sm:gap-3 pt-1 text-[10px] sm:text-[11px] font-bold">
+      <div className="flex gap-2 sm:gap-3 pt-1 text-[11px] sm:text-xs font-semibold">
         <button
           type="button"
           disabled={disabled || foods.length === 0}
           onClick={onConfirm}
-          className="flex-1 px-2.5 py-2.5 rounded-xl bg-[#FF7E67] hover:bg-[#ff6950] text-white flex items-center justify-center gap-1 sm:gap-1.5 shadow-md active:scale-98 transition-all disabled:opacity-45 disabled:cursor-not-allowed touch-manipulation"
+          className="flex-1 px-2.5 py-2.5 rounded-xl bg-white hover:bg-zinc-200 text-black flex items-center justify-center gap-1 sm:gap-1.5 shadow-white-sm active:scale-[0.98] transition-all disabled:opacity-45 disabled:cursor-not-allowed touch-manipulation"
         >
           <Check className="w-4 h-4 shrink-0" />
-          <span>CONFIRM & LOG</span>
+          <span>Confirm & Log</span>
         </button>
         <button
           type="button"
           disabled={disabled}
           onClick={onDiscard}
-          className="flex-1 px-2.5 py-2.5 rounded-xl border border-zinc-800 hover:border-zinc-700 bg-transparent text-white flex items-center justify-center gap-1 sm:gap-1.5 active:scale-98 transition-all disabled:opacity-45 disabled:cursor-not-allowed touch-manipulation"
+          className="flex-1 px-2.5 py-2.5 rounded-xl border border-zinc-700 hover:border-zinc-500 bg-transparent text-zinc-300 hover:text-white flex items-center justify-center gap-1 sm:gap-1.5 active:scale-[0.98] transition-all disabled:opacity-45 disabled:cursor-not-allowed touch-manipulation"
         >
           <X className="w-4 h-4 shrink-0" />
-          <span>DISCARD</span>
+          <span>Discard</span>
         </button>
       </div>
     </div>

@@ -79,12 +79,12 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
   for (let day = 1; day <= daysInMonth; day++) {
     const cellDateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    
+
     const isToday =
       day === today.getDate() &&
       currentMonth === today.getMonth() &&
       currentYear === today.getFullYear();
-      
+
     const isSelected = cellDateStr === selectedDate;
     const hasLog = loggedDays.includes(cellDateStr);
 
@@ -98,7 +98,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   }
 
   return (
-    <div className="w-full bg-zinc-950 border border-zinc-900 rounded-2xl p-3 sm:p-4 space-y-4 shadow-sm text-white select-none">
+    <div className="w-full card p-3.5 sm:p-4 space-y-4 text-zinc-100 select-none">
       {/* Calendar Header: Month/Year navigation */}
       <div className="flex justify-between items-center px-1">
         <h4 className="text-sm font-bold tracking-tight text-white font-sans">
@@ -107,13 +107,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         <div className="flex gap-1">
           <button
             onClick={handlePrevMonth}
-            className="p-1 rounded-lg border border-zinc-900 bg-zinc-950 text-zinc-400 hover:text-white transition-all duration-150 active:scale-95"
+            className="p-1.5 rounded-lg border border-zinc-800 bg-zinc-950 text-zinc-400 hover:text-white hover:border-zinc-600 transition-all duration-150 active:scale-95"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
           <button
             onClick={handleNextMonth}
-            className="p-1 rounded-lg border border-zinc-900 bg-zinc-950 text-zinc-400 hover:text-white transition-all duration-150 active:scale-95"
+            className="p-1.5 rounded-lg border border-zinc-800 bg-zinc-950 text-zinc-400 hover:text-white hover:border-zinc-600 transition-all duration-150 active:scale-95"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
@@ -124,7 +124,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       <div className="grid grid-cols-7 gap-y-2 text-center text-xs">
         {/* Days of week headers */}
         {daysOfWeek.map((d) => (
-          <span key={d} className="text-[10px] font-black text-zinc-600 uppercase tracking-wider font-mono">
+          <span key={d} className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider">
             {d}
           </span>
         ))}
@@ -139,21 +139,21 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             <div
               key={cell.dateStr}
               onClick={() => onSelectDate(cell.dateStr!)}
-              className={`relative py-1 sm:py-1.5 rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all duration-150 group font-mono font-medium touch-manipulation ${
+              className={`relative py-1 sm:py-1.5 rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all duration-150 group font-medium num touch-manipulation ${
                 cell.isSelected
-                  ? 'bg-[#FF7E67] text-white font-bold shadow-md scale-105 z-10'
+                  ? 'bg-white text-black font-bold shadow-white-sm scale-105 z-10'
                   : cell.isToday
-                  ? 'border border-white/60 text-white font-bold'
-                  : 'hover:bg-zinc-900/60 text-zinc-300 hover:text-white'
+                  ? 'border border-zinc-500 text-white font-bold'
+                  : 'hover:bg-zinc-800/70 text-zinc-400 hover:text-white'
               }`}
             >
               <span className="text-xs">{cell.dayNum}</span>
-              
+
               {/* Highlight dot for logged days */}
               {cell.hasLog && (
                 <span
                   className={`absolute bottom-1 w-1.5 h-1.5 rounded-full ${
-                    cell.isSelected ? 'bg-white' : 'bg-[#FF7E67]'
+                    cell.isSelected ? 'bg-black' : 'bg-white'
                   }`}
                 />
               )}

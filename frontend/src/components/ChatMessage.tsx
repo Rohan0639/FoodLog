@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Message, FoodItem, FoodEntry } from '../types';
-import { Bot, User, Flame, ChevronRight, Apple } from 'lucide-react';
+import { Sparkles, User, Flame, ChevronRight, Apple } from 'lucide-react';
 import { ReviewConfirmTable } from './ReviewConfirmTable';
 
 interface ChatMessageProps {
@@ -34,7 +34,11 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
     >
       {/* ── Avatar ── */}
       <div
-        className="rounded-xl flex items-center justify-center shrink-0 shadow-sm border bg-zinc-900 border-zinc-800 text-white"
+        className={`rounded-full flex items-center justify-center shrink-0 shadow-soft ${
+          isUser
+            ? 'bg-white text-black'
+            : 'bg-zinc-800 border border-zinc-700 text-white'
+        }`}
         style={{
           width: 'var(--avatar-sm)',
           height: 'var(--avatar-sm)',
@@ -44,7 +48,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
       >
         {isUser
           ? <User style={{ width: 'var(--icon-sm)', height: 'var(--icon-sm)' }} />
-          : <Bot  style={{ width: 'var(--icon-sm)', height: 'var(--icon-sm)' }} />
+          : <Sparkles style={{ width: 'var(--icon-sm)', height: 'var(--icon-sm)' }} />
         }
       </div>
 
@@ -55,10 +59,10 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
       >
         {/* Actual Bubble */}
         <div
-          className={`px-3 sm:px-4 py-2.5 sm:py-3 rounded-2xl leading-relaxed shadow-sm break-words w-full ${
+          className={`px-3.5 sm:px-4 py-2.5 sm:py-3 rounded-3xl leading-relaxed break-words w-full ${
             isUser
-              ? 'bg-white text-black font-semibold rounded-tr-none'
-              : 'bg-zinc-900 border border-zinc-800 text-zinc-100 rounded-tl-none'
+              ? 'bg-white text-black font-medium rounded-tr-lg shadow-soft-md'
+              : 'bg-zinc-900 border border-zinc-800 text-zinc-100 rounded-tl-lg shadow-soft'
           }`}
           style={{ fontSize: 'var(--fs-base)' }}
         >
@@ -93,17 +97,17 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
         {!message.isTyping &&
           message.parsedFoods &&
           message.parsedFoods.length > 0 && (
-            <div className="w-full mt-2 rounded-xl bg-zinc-950 border border-zinc-800 p-2.5 sm:p-3.5 space-y-3 shadow-inner animate-fade-in">
-              <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
+            <div className="w-full mt-2 rounded-2xl bg-zinc-900 border border-zinc-800 p-3 sm:p-4 space-y-3 shadow-soft animate-fade-in">
+              <div className="flex items-center justify-between pb-2.5 border-b border-zinc-800">
                 <span
-                  className="font-bold text-zinc-300 tracking-wide uppercase flex items-center gap-1.5"
+                  className="font-bold text-zinc-400 flex items-center gap-1.5"
                   style={{ fontSize: 'var(--fs-xs)' }}
                 >
                   <Apple style={{ width: 'var(--icon-xs)', height: 'var(--icon-xs)' }} className="text-white" />
-                  Parsed Food Logs
+                  Logged Foods
                 </span>
                 <span
-                  className="font-bold bg-white text-black px-2 py-0.5 rounded-full border border-zinc-200 flex items-center gap-1"
+                  className="chip font-bold bg-white text-black px-2.5 py-1 num"
                   style={{ fontSize: 'var(--fs-xs)' }}
                 >
                   <Flame style={{ width: 'var(--icon-xs)', height: 'var(--icon-xs)' }} className="text-black fill-black/10" />
@@ -113,20 +117,20 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
 
               <div className="space-y-2.5">
                 {message.parsedFoods.map((food: FoodItem) => (
-                  <div key={food.id} className="flex flex-col text-zinc-300" style={{ fontSize: 'var(--fs-xs)' }}>
+                  <div key={food.id} className="flex flex-col text-zinc-400" style={{ fontSize: 'var(--fs-xs)' }}>
                     <div className="flex justify-between items-start mb-1">
-                      <span className="font-semibold flex items-center gap-1 truncate max-w-[75%] text-zinc-200">
+                      <span className="font-semibold flex items-center gap-1 truncate max-w-[75%] text-zinc-200 capitalize">
                         <ChevronRight style={{ width: 'var(--icon-xs)', height: 'var(--icon-xs)' }} className="text-zinc-500 shrink-0" />
-                        <span className="text-zinc-400 font-semibold">{food.quantity}x</span> {food.name}
+                        <span className="text-zinc-500 font-semibold num">{food.quantity}x</span> {food.name}
                       </span>
-                      <span className="font-bold text-white shrink-0">{food.calories} kcal</span>
+                      <span className="font-bold text-white shrink-0 num">{food.calories} kcal</span>
                     </div>
-                    <div className="flex flex-wrap gap-2 text-zinc-400 pl-4 font-medium" style={{ fontSize: 'var(--fs-xs)' }}>
-                      <span>Protein: <strong className="text-zinc-300 font-semibold">{food.protein}g</strong></span>
-                      <span>Carbs: <strong className="text-zinc-300 font-semibold">{food.carbs}g</strong></span>
-                      <span>Fat: <strong className="text-zinc-300 font-semibold">{food.fats}g</strong></span>
-                      <span>Sugar: <strong className="text-zinc-300 font-semibold">{food.sugar || 0}g</strong></span>
-                      <span>Fiber: <strong className="text-zinc-300 font-semibold">{food.fiber || 0}g</strong></span>
+                    <div className="flex flex-wrap gap-x-2.5 gap-y-1 text-zinc-500 pl-4 font-medium num" style={{ fontSize: 'var(--fs-xs)' }}>
+                      <span>Protein <strong className="text-zinc-300 font-semibold">{food.protein}g</strong></span>
+                      <span>Carbs <strong className="text-zinc-300 font-semibold">{food.carbs}g</strong></span>
+                      <span>Fat <strong className="text-zinc-300 font-semibold">{food.fats}g</strong></span>
+                      <span>Sugar <strong className="text-zinc-300 font-semibold">{food.sugar || 0}g</strong></span>
+                      <span>Fiber <strong className="text-zinc-300 font-semibold">{food.fiber || 0}g</strong></span>
                     </div>
                   </div>
                 ))}
@@ -136,7 +140,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
 
         {/* Timestamp */}
         <span
-          className="text-zinc-500 mt-1 px-1 font-mono uppercase"
+          className="text-zinc-600 mt-0.5 px-1.5 font-medium num"
           style={{ fontSize: 'var(--fs-xs)' }}
         >
           {formatTime(message.timestamp)}

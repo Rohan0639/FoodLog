@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { SendHorizontal } from 'lucide-react';
+import { ArrowUp } from 'lucide-react';
 
 interface ChatInputProps {
   onSendMessage: (text: string) => void;
@@ -38,7 +38,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled = 
   return (
     <form
       onSubmit={handleSubmit}
-      className="bg-black border-t border-zinc-900 flex gap-2 items-end w-full"
+      className="bg-transparent flex gap-2 items-end w-full"
       style={{
         padding: 'clamp(8px, 2.5vw, 16px)',
         maxWidth: '100%',  /* never wider than viewport */
@@ -49,20 +49,20 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled = 
         className="flex gap-2 items-end w-full mx-auto"
         style={{ maxWidth: '672px' }} /* matches max-w-2xl */
       >
-        <div className="relative flex-1 flex items-center bg-zinc-950 border border-zinc-800 rounded-2xl focus-within:border-white focus-within:ring-2 focus-within:ring-white/10 transition-all duration-200 min-w-0">
+        <div className="relative flex-1 flex items-center bg-zinc-900 border border-zinc-800 rounded-3xl shadow-soft-md focus-within:border-zinc-500 focus-within:ring-4 focus-within:ring-white/5 transition-all duration-200 min-w-0">
           <textarea
             ref={textareaRef}
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="I ate 2 bananas and 3 eggs..."
+            placeholder="I ate 2 bananas and 3 eggs…"
             rows={1}
             disabled={disabled}
-            className="w-full bg-transparent text-white placeholder-zinc-500 focus:outline-none resize-none leading-relaxed self-center"
+            className="w-full bg-transparent text-white placeholder-zinc-500 focus:outline-none resize-none leading-relaxed self-center disabled:opacity-60"
             style={{
               paddingTop: 'clamp(10px, 2.5vw, 14px)',
               paddingBottom: 'clamp(10px, 2.5vw, 14px)',
-              paddingLeft: 'clamp(12px, 3vw, 16px)',
+              paddingLeft: 'clamp(14px, 3.5vw, 20px)',
               paddingRight: 'clamp(40px, 10vw, 52px)',
               fontSize: 'var(--fs-sm)',
               /* min-height uses dvh units so mobile keyboards don't break it */
@@ -73,10 +73,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled = 
           <button
             type="submit"
             disabled={!inputText.trim() || disabled}
-            className={`absolute right-2 bottom-2 rounded-xl flex items-center justify-center transition-all duration-200 shrink-0 ${
+            className={`absolute right-2 bottom-2 rounded-full flex items-center justify-center transition-all duration-200 shrink-0 ${
               inputText.trim() && !disabled
-                ? 'bg-white text-black shadow hover:bg-zinc-200 scale-100 hover:scale-105 active:scale-95'
-                : 'text-zinc-600 cursor-not-allowed bg-transparent scale-90'
+                ? 'bg-white text-black shadow-white-sm scale-100 hover:scale-105 active:scale-95'
+                : 'text-zinc-600 cursor-not-allowed bg-zinc-800/60 scale-90'
             }`}
             style={{
               width: 'var(--avatar-sm)',
@@ -84,7 +84,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled = 
               aspectRatio: '1',
             }}
           >
-            <SendHorizontal style={{ width: 'var(--icon-sm)', height: 'var(--icon-sm)' }} />
+            <ArrowUp style={{ width: 'var(--icon-sm)', height: 'var(--icon-sm)' }} />
           </button>
         </div>
       </div>

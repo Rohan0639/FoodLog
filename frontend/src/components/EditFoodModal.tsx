@@ -95,26 +95,35 @@ export const EditFoodModal: React.FC<EditFoodModalProps> = ({
     }
   };
 
+  const macroTiles: { label: string; value: string }[] = [
+    { label: 'Calories', value: `${calories}` },
+    { label: 'Protein', value: `${protein}g` },
+    { label: 'Carbs', value: `${carbs}g` },
+    { label: 'Fat', value: `${fats}g` },
+    { label: 'Sugar', value: `${sugar}g` },
+    { label: 'Fiber', value: `${fiber}g` },
+  ];
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
-      <div className="relative w-full max-w-md bg-zinc-950 border border-zinc-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-slide-up">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-fade-in">
+      <div className="relative w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-3xl shadow-soft-lg flex flex-col overflow-hidden animate-pop-in">
         {/* Header */}
-        <div className="p-4 border-b border-zinc-900 flex justify-between items-center bg-black/50">
-          <h3 className="font-bold text-sm text-white uppercase tracking-wider">
-            Edit Food Entry
+        <div className="p-4 sm:p-5 border-b border-zinc-800 flex justify-between items-center">
+          <h3 className="font-bold text-sm text-white tracking-tight">
+            Edit food entry
           </h3>
           <button
             onClick={onClose}
-            className="p-1 rounded-lg hover:bg-zinc-900 text-zinc-400 hover:text-white transition-all duration-200"
+            className="p-1.5 rounded-full hover:bg-zinc-800 text-zinc-500 hover:text-white transition-all duration-200"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSave} className="p-4 space-y-4">
+        <form onSubmit={handleSave} className="p-4 sm:p-5 space-y-4">
           {error && (
-            <div className="flex items-center gap-2 text-xs bg-red-950/30 border border-red-900/50 text-red-400 p-3 rounded-xl font-medium">
+            <div className="flex items-center gap-2 text-xs bg-zinc-950 border border-zinc-700 text-zinc-300 p-3 rounded-2xl font-medium">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{error}</span>
             </div>
@@ -122,14 +131,14 @@ export const EditFoodModal: React.FC<EditFoodModalProps> = ({
 
           {/* Food Name */}
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-              Food Name
+            <label className="text-xs font-semibold text-zinc-400 pl-1">
+              Food name
             </label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 bg-black border border-zinc-800 focus:border-white rounded-xl text-xs text-white placeholder-zinc-700 focus:outline-none transition-all duration-200"
+              className="w-full px-3.5 py-2.5 bg-zinc-950 border border-zinc-800 focus:border-zinc-500 focus:ring-4 focus:ring-white/5 rounded-2xl text-xs text-white placeholder-zinc-600 focus:outline-none transition-all duration-200"
               placeholder="e.g., Banana, Boiled Egg"
             />
           </div>
@@ -137,7 +146,7 @@ export const EditFoodModal: React.FC<EditFoodModalProps> = ({
           <div className="grid grid-cols-2 gap-4">
             {/* Quantity */}
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+              <label className="text-xs font-semibold text-zinc-400 pl-1">
                 Quantity
               </label>
               <input
@@ -146,19 +155,19 @@ export const EditFoodModal: React.FC<EditFoodModalProps> = ({
                 min="0.001"
                 value={quantity}
                 onChange={(e) => setQuantity(parseFloat(e.target.value) || 0)}
-                className="w-full px-3 py-2 bg-black border border-zinc-800 focus:border-white rounded-xl text-xs text-white focus:outline-none transition-all duration-200"
+                className="w-full px-3.5 py-2.5 bg-zinc-950 border border-zinc-800 focus:border-zinc-500 focus:ring-4 focus:ring-white/5 rounded-2xl text-xs text-white num focus:outline-none transition-all duration-200"
               />
             </div>
 
             {/* Unit */}
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+              <label className="text-xs font-semibold text-zinc-400 pl-1">
                 Unit
               </label>
               <select
                 value={unit || 'g'}
                 onChange={(e) => setUnit(e.target.value)}
-                className="w-full px-3 py-2 bg-black border border-zinc-800 focus:border-white rounded-xl text-xs text-white focus:outline-none transition-all duration-200 select-arrow"
+                className="w-full px-3.5 py-2.5 bg-zinc-950 border border-zinc-800 focus:border-zinc-500 focus:ring-4 focus:ring-white/5 rounded-2xl text-xs text-white focus:outline-none transition-all duration-200 select-arrow"
               >
                 {unit && !Object.values(UNIT_CATEGORIES).flat().includes(unit) && (
                   <option value={unit}>{unit}</option>
@@ -189,52 +198,34 @@ export const EditFoodModal: React.FC<EditFoodModalProps> = ({
           </div>
 
           {/* Recalculated Macros Preview */}
-          <div className="p-3 bg-black rounded-xl border border-zinc-900 space-y-2">
-            <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider font-mono">
-              Live Nutrient Recalculation
+          <div className="p-3.5 bg-zinc-950 rounded-2xl border border-zinc-800 space-y-2.5">
+            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+              Live recalculation
             </span>
             <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="p-1.5 bg-zinc-950 border border-zinc-900 rounded-lg">
-                <span className="block text-[10px] font-bold text-white font-mono">{calories}</span>
-                <span className="text-[8px] text-zinc-500 uppercase tracking-wider">Calories</span>
-              </div>
-              <div className="p-1.5 bg-zinc-950 border border-zinc-900 rounded-lg">
-                <span className="block text-[10px] font-bold text-white font-mono">{protein}g</span>
-                <span className="text-[8px] text-zinc-500 uppercase tracking-wider">Protein</span>
-              </div>
-              <div className="p-1.5 bg-zinc-950 border border-zinc-900 rounded-lg">
-                <span className="block text-[10px] font-bold text-white font-mono">{carbs}g</span>
-                <span className="text-[8px] text-zinc-500 uppercase tracking-wider">Carbs</span>
-              </div>
-              <div className="p-1.5 bg-zinc-950 border border-zinc-900 rounded-lg">
-                <span className="block text-[10px] font-bold text-white font-mono">{fats}g</span>
-                <span className="text-[8px] text-zinc-500 uppercase tracking-wider">Fat</span>
-              </div>
-              <div className="p-1.5 bg-zinc-950 border border-zinc-900 rounded-lg">
-                <span className="block text-[10px] font-bold text-white font-mono">{sugar}g</span>
-                <span className="text-[8px] text-zinc-500 uppercase tracking-wider">Sugar</span>
-              </div>
-              <div className="p-1.5 bg-zinc-950 border border-zinc-900 rounded-lg">
-                <span className="block text-[10px] font-bold text-white font-mono">{fiber}g</span>
-                <span className="text-[8px] text-zinc-500 uppercase tracking-wider">Fiber</span>
-              </div>
+              {macroTiles.map((tile) => (
+                <div key={tile.label} className="p-2 bg-zinc-900 border border-zinc-800 rounded-xl">
+                  <span className="block text-xs font-bold text-white num">{tile.value}</span>
+                  <span className="text-[8.5px] text-zinc-500 uppercase tracking-wider font-semibold">{tile.label}</span>
+                </div>
+              ))}
             </div>
           </div>
 
           {/* Form Actions */}
-          <div className="flex justify-end gap-2 pt-2 text-[10px]">
+          <div className="flex justify-end gap-2 pt-2 text-xs font-semibold">
             <button
               type="button"
               onClick={onClose}
               disabled={isSaving}
-              className="px-3.5 py-2 rounded-xl border border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-white transition-all duration-200"
+              className="px-4 py-2.5 rounded-xl border border-zinc-700 hover:border-zinc-500 text-zinc-400 hover:text-white transition-all duration-200"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSaving}
-              className="px-3.5 py-2 rounded-xl bg-white text-black font-bold hover:bg-zinc-200 transition-all duration-200 flex items-center gap-1.5 shadow"
+              className="px-4 py-2.5 rounded-xl bg-white hover:bg-zinc-200 text-black font-bold transition-all duration-200 flex items-center gap-1.5 shadow-white-sm disabled:opacity-60"
             >
               {isSaving && <Loader2 className="w-3.5 h-3.5 animate-spin text-black" />}
               Save Changes

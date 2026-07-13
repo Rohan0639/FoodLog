@@ -53,9 +53,9 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="h-screen w-full flex flex-col items-center justify-center bg-black text-white gap-3">
+      <div className="h-screen w-full flex flex-col items-center justify-center bg-zinc-950 text-zinc-100 gap-3">
         <Loader2 className="w-8 h-8 animate-spin text-white" />
-        <span className="text-xs text-zinc-500 font-bold uppercase tracking-wider">Loading Session...</span>
+        <span className="text-xs text-zinc-500 font-semibold">Loading your session…</span>
       </div>
     );
   }

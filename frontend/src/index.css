@@ -34,7 +34,10 @@
   --avatar-md: clamp(32px, 8vw, 40px);
 
   /* Navbar height */
-  --navbar-h: clamp(52px, 10vw, 64px);
+  --navbar-h: clamp(56px, 10vw, 68px);
+
+  /* Bottom tab bar height (mobile app navigation) */
+  --tabbar-h: clamp(56px, 12vw, 64px);
 }
 
 @layer base {
@@ -43,10 +46,11 @@
   }
 
   body {
-    @apply bg-black text-white antialiased font-sans m-0 p-0;
+    @apply bg-zinc-950 text-zinc-100 antialiased font-sans m-0 p-0;
     overflow-x: hidden;
     overflow-y: hidden;
     height: 100dvh; /* use dvh so mobile chrome bottom bar is accounted for */
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   }
 
   #root {
@@ -59,8 +63,8 @@
 
 /* ─── Custom Scrollbar ──────────────────────────────────── */
 ::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
@@ -68,27 +72,48 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.14);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.28);
 }
 
-/* ─── Glassmorphism ─────────────────────────────────────── */
+/* ─── Soft Card Surfaces ────────────────────────────────── */
+@layer components {
+  .card {
+    @apply bg-zinc-900 border border-zinc-800 rounded-2xl shadow-soft;
+  }
+
+  .card-inset {
+    @apply bg-zinc-950/70 border border-zinc-800 rounded-xl;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full font-semibold;
+  }
+
+  /* Tabular numbers for stats */
+  .num {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+}
+
+/* ─── Frosted Header / Tab Bar ──────────────────────────── */
 .glass {
-  background: rgba(10, 10, 10, 0.8);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(9, 9, 11, 0.82);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 .glass-monochrome {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(24, 24, 27, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.09);
 }
 
 /* ─── Mobile Drawer Slide Transition ───────────────────── */
