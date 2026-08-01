@@ -1,7 +1,11 @@
 import React from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import type { FoodEntry } from '../types';
 import { scaleMacrosByQuantity } from '../utils/unitConverter';
-import { Check, X } from 'lucide-react';
+import { Check, X, Minus, Plus, ClipboardList } from 'lucide-react';
+import {Button, CountUp} from '../ui/primitives';
+import { cx } from '../ui/cx';
+import { listItem, spring, stagger } from '../ui/motion';
 
 interface ReviewConfirmTableProps {
   foods: FoodEntry[];
@@ -10,6 +14,16 @@ interface ReviewConfirmTableProps {
   onDiscard: () => void;
   disabled?: boolean;
 }
+
+const UNITS = ['g', 'ml', 'piece', 'cup'];
+
+const MACRO_KEYS: { key: 'protein' | 'carbs' | 'fats' | 'sugar' | 'fiber'; label: string; color: string }[] = [
+  { key: 'protein', label: 'Protein', color: '#FFFFFF' },
+  { key: 'carbs', label: 'Carbs', color: '#DCDCE0' },
+  { key: 'fats', label: 'Fat', color: '#B8B8C0' },
+  { key: 'sugar', label: 'Sugar', color: '#9A9AA3' },
+  { key: 'fiber', label: 'Fiber', color: '#7E7E88' },
+];
 
 export const ReviewConfirmTable: React.FC<ReviewConfirmTableProps> = ({
   foods,
@@ -26,6 +40,19 @@ export const ReviewConfirmTable: React.FC<ReviewConfirmTableProps> = ({
           ? { ...item, quantity: isNaN(numericValue) ? 0 : numericValue }
           : item
       )
+    );
+  };
+
+  /** Stepper: a sensible increment for the unit, never going below zero. */
+  const stepQty = (id: string, direction: 1 | -1) => {
+    setFoods((prev) =>
+      prev.map((item) => {
+        if (item.id !== id) return item;
+        const unit = (item.unit || '').toLowerCase();
+        const step = unit === 'g' || unit === 'ml' ? 10 : 1;
+        const next = Math.round((item.quantity + direction * step) * 100) / 100;
+        return { ...item, quantity: Math.max(0, next) };
+      })
     );
   };
 
@@ -79,197 +106,203 @@ export const ReviewConfirmTable: React.FC<ReviewConfirmTableProps> = ({
   );
 
   return (
-    <div className="w-full mt-2 rounded-2xl bg-zinc-900 border border-zinc-800 p-3 sm:p-4 space-y-3 sm:space-y-4 shadow-soft-md animate-fade-in text-zinc-100 font-sans max-w-lg">
-      {/* Title Header */}
-      <div className="pb-2.5 border-b border-zinc-800 flex flex-col gap-1">
-        <span className="text-xs font-bold text-white uppercase tracking-wider font-sans">
-          Review estimates
-        </span>
-      </div>
+    <motion.div
+      layout
+      variants={stagger(0.05)}
+      initial="hidden"
+      animate="show"
+      className="w-full mt-1.5 rounded-3xl bg-surface-card p-3.5 sm:p-4 space-y-3 shadow-float border-2 border-white/10 max-w-lg"
+    >
+      {/* Header */}
+      <motion.div variants={listItem} className="flex items-center gap-2 pb-2.5 border-b-2 border-surface-inset">
+        <div className="w-8 h-8 rounded-xl bg-white/10 text-accent flex items-center justify-center shrink-0">
+          <ClipboardList className="w-4 h-4" />
+        </div>
+        <div className="min-w-0">
+          <span className="block text-sm font-extrabold text-fg-strong leading-tight">Check this over</span>
+          <span className="block text-[11px] font-bold text-fg-dim">Adjust amounts before logging</span>
+        </div>
+      </motion.div>
 
       {foods.length === 0 ? (
-        <div className="py-8 text-center text-zinc-500 text-xs">
-          No food items to log. Add some foods or discard.
+        <div className="py-8 text-center text-fg-dim text-xs font-bold">
+          Nothing left to log. Add some foods or discard.
         </div>
       ) : (
-        <>
-          {/* Mobile Card List View */}
-          <div className="block sm:hidden space-y-2.5 max-h-64 overflow-y-auto pr-1">
+        <div className="space-y-2.5 max-h-[46vh] overflow-y-auto pr-0.5">
+          <AnimatePresence initial={false} mode="popLayout">
             {foods.map((food) => {
               const scaled = getScaledMacros(food);
               return (
-                <div key={food.id} className="p-3 bg-zinc-950/70 border border-zinc-800 rounded-xl space-y-2 relative">
-                  <div className="flex justify-between items-start">
-                    <span className="font-semibold text-zinc-200 capitalize truncate pr-6 text-xs" title={food.name}>
+                <motion.div
+                  key={food.id}
+                  layout
+                  variants={listItem}
+                  initial="hidden"
+                  animate="show"
+                  exit="exit"
+                  className="card-inset p-3 space-y-2.5 relative"
+                >
+                  {/* Name + remove */}
+                  <div className="flex justify-between items-start gap-2">
+                    <span
+                      className="font-extrabold text-fg-strong capitalize text-sm leading-snug pr-1 break-words"
+                      title={food.name}
+                    >
                       {food.name}
                     </span>
-                    <button
+                    <motion.button
                       type="button"
                       disabled={disabled}
                       onClick={() => handleDeleteRow(food.id)}
-                      className="absolute top-2.5 right-2.5 text-zinc-500 hover:text-white hover:bg-zinc-800 p-1 rounded-md transition-all duration-150"
-                      title="Delete item"
+                      whileHover={{ scale: 1.15, rotate: 90 }}
+                      whileTap={{ scale: 0.85 }}
+                      transition={spring}
+                      className="text-fg-dim hover:text-accent shrink-0 p-1 -m-1 rounded-full
+                                 disabled:opacity-40 touch-manipulation"
+                      aria-label={`Remove ${food.name}`}
                     >
-                      <X className="w-4 h-4" />
-                    </button>
+                      <X className="w-4 h-4" strokeWidth={2.6} />
+                    </motion.button>
                   </div>
-                  <div className="flex items-center justify-between gap-1.5 flex-wrap">
-                    <div className="flex items-center gap-1 sm:gap-1.5">
+
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    {/* Quantity stepper */}
+                    <div className="flex items-center gap-1.5">
+                      <motion.button
+                        type="button"
+                        disabled={disabled}
+                        onClick={() => stepQty(food.id, -1)}
+                        whileTap={{ scale: 0.85 }}
+                        className="w-7 h-7 rounded-full bg-surface-card border-2 border-surface-line text-fg-muted
+                                   hover:border-white/[0.14] hover:text-accent flex items-center justify-center
+                                   shrink-0 disabled:opacity-40 touch-manipulation"
+                        aria-label="Decrease quantity"
+                      >
+                        <Minus className="w-3.5 h-3.5" strokeWidth={3} />
+                      </motion.button>
+
                       <input
                         type="number"
                         step="any"
                         min="0"
+                        inputMode="decimal"
                         disabled={disabled}
                         value={food.quantity === 0 ? '' : food.quantity}
                         onChange={(e) => handleQtyChange(food.id, e.target.value)}
-                        className="w-12 px-1 py-1 text-center bg-zinc-900 border border-zinc-700 rounded-lg text-white num focus:outline-none focus:border-zinc-400 disabled:opacity-55 disabled:cursor-not-allowed text-[11px]"
+                        className="field-sm w-14 text-center num disabled:opacity-55"
                         placeholder="0"
+                        aria-label={`Quantity of ${food.name}`}
                       />
+
+                      <motion.button
+                        type="button"
+                        disabled={disabled}
+                        onClick={() => stepQty(food.id, 1)}
+                        whileTap={{ scale: 0.85 }}
+                        className="w-7 h-7 rounded-full bg-surface-card border-2 border-surface-line text-fg-muted
+                                   hover:border-white/[0.14] hover:text-accent flex items-center justify-center
+                                   shrink-0 disabled:opacity-40 touch-manipulation"
+                        aria-label="Increase quantity"
+                      >
+                        <Plus className="w-3.5 h-3.5" strokeWidth={3} />
+                      </motion.button>
+
                       <select
                         value={food.unit || 'g'}
                         disabled={disabled}
                         onChange={(e) => handleUnitChange(food.id, e.target.value)}
-                        className="px-1.5 py-1 bg-zinc-900 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-zinc-400 disabled:opacity-55 disabled:cursor-not-allowed text-[11px] cursor-pointer select-arrow pr-3.5"
+                        className="field-sm select-arrow cursor-pointer disabled:opacity-55 text-xs"
+                        aria-label={`Unit for ${food.name}`}
                       >
-                        {food.unit && !['g', 'ml', 'piece', 'cup'].includes(food.unit) && (
+                        {food.unit && !UNITS.includes(food.unit) && (
                           <option value={food.unit}>{food.unit}</option>
                         )}
-                        <option value="g">g</option>
-                        <option value="ml">ml</option>
-                        <option value="piece">piece</option>
-                        <option value="cup">cup</option>
+                        {UNITS.map((u) => (
+                          <option key={u} value={u}>{u}</option>
+                        ))}
                       </select>
                     </div>
-                    <div className="text-right num">
-                      <div className="text-white font-bold text-[11px]">{scaled.calories} kcal</div>
-                      <div className="text-[9px] text-zinc-400 mt-0.5 font-medium">
-                        P {scaled.protein}g · C {scaled.carbs}g · F {scaled.fats}g · S {scaled.sugar}g · Fib {scaled.fiber}g
-                      </div>
-                    </div>
+
+                    {/* Live calories */}
+                    <motion.span
+                      key={scaled.calories}
+                      initial={{ scale: 1.14 }}
+                      animate={{ scale: 1 }}
+                      transition={spring}
+                      className="chip grad-accent px-3 py-1.5 text-xs shadow-glow num shrink-0"
+                    >
+                      {scaled.calories} kcal
+                    </motion.span>
                   </div>
-                </div>
+
+                  {/* Macro chips */}
+                  <div className="flex flex-wrap gap-1.5">
+                    {MACRO_KEYS.map((macro) => (
+                      <span
+                        key={macro.key}
+                        className="chip px-2 py-0.5 text-[10px]"
+                        style={{ backgroundColor: `${macro.color}1A`, color: macro.color }}
+                      >
+                        {macro.label} {scaled[macro.key]}g
+                      </span>
+                    ))}
+                  </div>
+                </motion.div>
               );
             })}
-          </div>
-
-          {/* Desktop/Tablet Table View */}
-          <div className="hidden sm:block overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-zinc-800 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-zinc-500">
-                  <th className="pb-2 font-semibold">Food Item</th>
-                  <th className="pb-2 font-semibold pl-2 sm:pl-4">Qty</th>
-                  <th className="pb-2 text-right font-semibold">Nutrition Info</th>
-                  <th className="pb-2 text-right w-8"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-800 text-xs">
-                {foods.map((food) => {
-                  const scaled = getScaledMacros(food);
-                  return (
-                    <tr key={food.id} className="hover:bg-zinc-800/40 transition-colors">
-                      {/* Food Name */}
-                      <td className="py-2.5 sm:py-3 pr-1 sm:pr-2 font-semibold text-zinc-200 capitalize max-w-[90px] min-[370px]:max-w-[120px] truncate" title={food.name}>
-                        {food.name}
-                      </td>
-
-                      {/* Qty Editable Input + Unit Selector */}
-                      <td className="py-2.5 sm:py-3 pl-2 sm:pl-4">
-                        <div className="flex items-center gap-1 sm:gap-1.5">
-                          <input
-                            type="number"
-                            step="any"
-                            min="0"
-                            disabled={disabled}
-                            value={food.quantity === 0 ? '' : food.quantity}
-                            onChange={(e) => handleQtyChange(food.id, e.target.value)}
-                            className="w-11 min-[370px]:w-14 px-1 sm:px-1.5 py-1 text-center bg-zinc-950 border border-zinc-700 rounded-lg text-white num focus:outline-none focus:border-zinc-400 disabled:opacity-55 disabled:cursor-not-allowed text-[11px] sm:text-xs"
-                            placeholder="0"
-                          />
-                          <select
-                            value={food.unit || 'g'}
-                            disabled={disabled}
-                            onChange={(e) => handleUnitChange(food.id, e.target.value)}
-                            className="px-1 sm:px-1.5 py-1 bg-zinc-950 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-zinc-400 disabled:opacity-55 disabled:cursor-not-allowed text-[11px] sm:text-xs cursor-pointer select-arrow pr-3 min-[370px]:pr-4"
-                          >
-                            {food.unit && !['g', 'ml', 'piece', 'cup'].includes(food.unit) && (
-                              <option value={food.unit}>{food.unit}</option>
-                            )}
-                            <option value="g">g</option>
-                            <option value="ml">ml</option>
-                            <option value="piece">piece</option>
-                            <option value="cup">cup</option>
-                          </select>
-                        </div>
-                      </td>
-
-                      {/* Dynamic Nutrition calculations */}
-                      <td className="py-2.5 sm:py-3 text-right num">
-                        <div className="text-white font-bold text-[11px] sm:text-xs">{scaled.calories} kcal</div>
-                        <div className="text-[8.5px] sm:text-[9.5px] text-zinc-400 mt-0.5 font-medium">
-                          P {scaled.protein}g · C {scaled.carbs}g · F {scaled.fats}g · S {scaled.sugar}g · Fib {scaled.fiber}g
-                        </div>
-                      </td>
-
-                      {/* Row Delete Button */}
-                      <td className="py-2.5 sm:py-3 text-right pl-1.5 sm:pl-2">
-                        <button
-                          type="button"
-                          disabled={disabled}
-                          onClick={() => handleDeleteRow(food.id)}
-                          className="text-zinc-500 hover:text-white hover:bg-zinc-800 p-1 rounded-md transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed touch-manipulation"
-                          title="Delete item"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
-
-      {/* Dynamic Summary Row */}
-      {foods.length > 0 && (
-        <div className="p-3 bg-zinc-950/70 rounded-xl border border-zinc-800 space-y-1.5">
-          <div className="flex justify-between items-center text-xs font-bold text-zinc-200">
-            <span>Total estimated intake</span>
-            <span className="num text-white text-sm">{totals.calories} kcal</span>
-          </div>
-          <div className="flex flex-wrap justify-between gap-x-2.5 gap-y-1 text-[10px] text-zinc-500 num pl-0 font-medium">
-            <span>Protein <strong className="text-zinc-300 font-semibold">{Math.round(totals.protein * 10) / 10}g</strong></span>
-            <span>Carbs <strong className="text-zinc-300 font-semibold">{Math.round(totals.carbs * 10) / 10}g</strong></span>
-            <span>Fat <strong className="text-zinc-300 font-semibold">{Math.round(totals.fats * 10) / 10}g</strong></span>
-            <span>Sugar <strong className="text-zinc-300 font-semibold">{Math.round(totals.sugar * 10) / 10}g</strong></span>
-            <span>Fiber <strong className="text-zinc-300 font-semibold">{Math.round(totals.fiber * 10) / 10}g</strong></span>
-          </div>
+          </AnimatePresence>
         </div>
       )}
 
-      {/* Confirm & Discard CTA Buttons */}
-      <div className="flex gap-2 sm:gap-3 pt-1 text-[11px] sm:text-xs font-semibold">
-        <button
-          type="button"
+      {/* Totals */}
+      <AnimatePresence>
+        {foods.length > 0 && (
+          <motion.div
+            layout
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            className="rounded-2xl grad-panel border-2 border-surface-line p-3 space-y-2"
+          >
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-extrabold text-fg-base">Total</span>
+              <span className="text-lg font-extrabold text-accent num">
+                <CountUp value={totals.calories} suffix=" kcal" />
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {MACRO_KEYS.map((macro) => (
+                <span
+                  key={macro.key}
+                  className="chip px-2 py-0.5 text-[10px]"
+                  style={{ backgroundColor: `${macro.color}1A`, color: macro.color }}
+                >
+                  {macro.label} {Math.round(totals[macro.key] * 10) / 10}g
+                </span>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Actions */}
+      <div className={cx('flex gap-2 pt-0.5')}>
+        <Button
+          variant="primary"
+          size="md"
+          fullWidth
           disabled={disabled || foods.length === 0}
           onClick={onConfirm}
-          className="flex-1 px-2.5 py-2.5 rounded-xl bg-white hover:bg-zinc-200 text-black flex items-center justify-center gap-1 sm:gap-1.5 shadow-white-sm active:scale-[0.98] transition-all disabled:opacity-45 disabled:cursor-not-allowed touch-manipulation"
         >
-          <Check className="w-4 h-4 shrink-0" />
-          <span>Confirm & Log</span>
-        </button>
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={onDiscard}
-          className="flex-1 px-2.5 py-2.5 rounded-xl border border-zinc-700 hover:border-zinc-500 bg-transparent text-zinc-300 hover:text-white flex items-center justify-center gap-1 sm:gap-1.5 active:scale-[0.98] transition-all disabled:opacity-45 disabled:cursor-not-allowed touch-manipulation"
-        >
-          <X className="w-4 h-4 shrink-0" />
-          <span>Discard</span>
-        </button>
+          <Check className="w-4 h-4 shrink-0" strokeWidth={3} />
+          Log it!
+        </Button>
+        <Button variant="soft" size="md" disabled={disabled} onClick={onDiscard} className="shrink-0">
+          <X className="w-4 h-4 shrink-0" strokeWidth={3} />
+          Discard
+        </Button>
       </div>
-    </div>
+    </motion.div>
   );
 };

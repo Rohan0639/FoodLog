@@ -1,4 +1,5 @@
 import React from 'react';
+import { AnimatePresence } from 'framer-motion';
 import type { Message, FoodEntry } from '../types';
 import { EmptyState } from './EmptyState';
 import { ChatMessage } from './ChatMessage';
@@ -35,45 +36,48 @@ export default function FoodLogger({
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden relative min-h-0 min-w-0">
-      {/* Chat Thread */}
+      {/* Chat thread */}
       <div
-        className="flex-1 overflow-y-auto space-y-2 max-w-2xl mx-auto w-full min-h-0"
-        style={{ padding: 'clamp(8px, 2vw, 16px)' }}
+        className="flex-1 overflow-y-auto max-w-2xl mx-auto w-full min-h-0"
+        style={{ padding: 'clamp(6px, 2vw, 14px)' }}
       >
         {messages.length === 1 && logs.length === 0 ? (
           <EmptyState onSelectSuggestion={handleSelectSuggestion} />
         ) : (
-          <div className="flex flex-col gap-1">
-            {messages.map((message) => (
-              <ChatMessage
-                key={message.id}
-                message={message}
-                activeFoods={message.id === activeReviewMessageId ? activeFoods : undefined}
-                setActiveFoods={message.id === activeReviewMessageId ? setActiveFoods : undefined}
-                onConfirm={message.id === activeReviewMessageId ? onConfirmLog : undefined}
-                onDiscard={message.id === activeReviewMessageId ? onDiscard : undefined}
-                isActionDisabled={isBotTyping}
-              />
-            ))}
-            
-            {/* Bot typing simulation */}
-            {isBotTyping && (
-              <ChatMessage
-                message={{
-                  id: 'typing',
-                  sender: 'bot',
-                  text: '',
-                  timestamp: new Date(),
-                  isTyping: true,
-                }}
-              />
-            )}
+          <div className="flex flex-col">
+            <AnimatePresence initial={false} mode="popLayout">
+              {messages.map((message) => (
+                <ChatMessage
+                  key={message.id}
+                  message={message}
+                  activeFoods={message.id === activeReviewMessageId ? activeFoods : undefined}
+                  setActiveFoods={message.id === activeReviewMessageId ? setActiveFoods : undefined}
+                  onConfirm={message.id === activeReviewMessageId ? onConfirmLog : undefined}
+                  onDiscard={message.id === activeReviewMessageId ? onDiscard : undefined}
+                  isActionDisabled={isBotTyping}
+                />
+              ))}
+
+              {/* Bot typing simulation */}
+              {isBotTyping && (
+                <ChatMessage
+                  key="typing"
+                  message={{
+                    id: 'typing',
+                    sender: 'bot',
+                    text: '',
+                    timestamp: new Date(),
+                    isTyping: true,
+                  }}
+                />
+              )}
+            </AnimatePresence>
             <div ref={messagesEndRef} />
           </div>
         )}
       </div>
 
-      {/* Bottom Input Area */}
+      {/* Floating input */}
       <ChatInput onSendMessage={onSendMessage} disabled={isBotTyping || !!activeReviewMessageId} />
     </div>
   );

@@ -1,6 +1,10 @@
 import React from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import type { FoodEntry } from '../types';
-import { Target, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import {Card, CountUp, IconButton, Skeleton} from '../ui/primitives';
+import { cx } from '../ui/cx';
+import { cardIn, listItem, stagger } from '../ui/motion';
 
 interface DayLogViewProps {
   dateString: string;
@@ -16,6 +20,14 @@ interface DayLogViewProps {
   isLoading?: boolean;
 }
 
+const SUMMARY_TILES = [
+  { key: 'protein', label: 'Protein', color: '#FFFFFF' },
+  { key: 'carbs', label: 'Carbs', color: '#DCDCE0' },
+  { key: 'fat', label: 'Fat', color: '#B8B8C0' },
+  { key: 'fiber', label: 'Fiber', color: '#7E7E88' },
+  { key: 'sugar', label: 'Sugar', color: '#9A9AA3' },
+] as const;
+
 export const DayLogView: React.FC<DayLogViewProps> = ({
   dateString,
   items,
@@ -25,8 +37,8 @@ export const DayLogView: React.FC<DayLogViewProps> = ({
   totalFats,
   totalSugar,
   totalFiber,
-  // onDeleteEntry is kept in the interface for backwards compatibility but not used in read-only view
-  onDeleteEntry: _onDeleteEntry,
+  // `onDeleteEntry` stays in the props contract for the parent, but this view is
+  // read-only, so it is intentionally not destructured here.
   onSelectDate,
   isLoading = false,
 }) => {
@@ -52,153 +64,156 @@ export const DayLogView: React.FC<DayLogViewProps> = ({
     }
   };
 
+  const shiftDay = (delta: number) => {
+    const d = new Date(dateString + 'T00:00:00');
+    d.setDate(d.getDate() + delta);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    onSelectDate?.(`${y}-${m}-${day}`);
+  };
+
+  const totals: Record<string, number> = {
+    protein: totalProtein,
+    carbs: totalCarbs,
+    fat: totalFats,
+    fiber: totalFiber,
+    sugar: totalSugar,
+  };
+
   return (
-    <div className="w-full space-y-4 font-sans text-zinc-100">
-      {/* Date Header Title with Prev/Next Navigation */}
+    <motion.div variants={stagger(0.05)} className="w-full space-y-3">
+      {/* Date header */}
       <div className="flex justify-between items-center px-1">
-        <h4 className="text-xs font-bold text-zinc-400">
-          {formatReadableDate(dateString)}
-        </h4>
+        <h4 className="text-sm font-extrabold text-fg-base">{formatReadableDate(dateString)}</h4>
         {onSelectDate && (
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => {
-                const d = new Date(dateString + 'T00:00:00');
-                d.setDate(d.getDate() - 1);
-                const y = d.getFullYear();
-                const m = String(d.getMonth() + 1).padStart(2, '0');
-                const day = String(d.getDate()).padStart(2, '0');
-                onSelectDate(`${y}-${m}-${day}`);
-              }}
-              className="p-1.5 rounded-lg border border-zinc-800 bg-zinc-950 text-zinc-400 hover:text-white hover:border-zinc-600 transition-all duration-150 active:scale-95"
-              title="Previous day"
-            >
-              <ChevronLeft className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => {
-                const d = new Date(dateString + 'T00:00:00');
-                d.setDate(d.getDate() + 1);
-                const y = d.getFullYear();
-                const m = String(d.getMonth() + 1).padStart(2, '0');
-                const day = String(d.getDate()).padStart(2, '0');
-                onSelectDate(`${y}-${m}-${day}`);
-              }}
-              className="p-1.5 rounded-lg border border-zinc-800 bg-zinc-950 text-zinc-400 hover:text-white hover:border-zinc-600 transition-all duration-150 active:scale-95"
-              title="Next day"
-            >
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
+          <div className="flex items-center gap-1.5">
+            <IconButton label="Previous day" onClick={() => shiftDay(-1)} className="p-1.5">
+              <ChevronLeft className="w-3.5 h-3.5" strokeWidth={2.8} />
+            </IconButton>
+            <IconButton label="Next day" onClick={() => shiftDay(1)} className="p-1.5">
+              <ChevronRight className="w-3.5 h-3.5" strokeWidth={2.8} />
+            </IconButton>
           </div>
         )}
       </div>
 
-      {isLoading ? (
-        <div className="py-8 text-center text-zinc-500 text-xs animate-pulse">
-          Loading logs…
-        </div>
-      ) : items.length === 0 ? (
-        /* Empty State */
-        <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-zinc-800 rounded-2xl text-center bg-zinc-900/40">
-          <Target className="w-6 h-6 text-zinc-600 mb-2" />
-          <p className="text-xs text-zinc-400 font-semibold">No food logs for this date.</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {/* Daily Nutrition Summary */}
-          <div className="p-3.5 sm:p-4 card space-y-3">
-            <div className="flex justify-between items-baseline">
-              <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                Daily Summary
-              </span>
-              <span className="text-xl font-bold num text-white">
-                {totalCalories} <span className="text-xs text-zinc-500 font-medium">kcal</span>
-              </span>
-            </div>
-            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 text-[10px] text-zinc-400 num">
-              <div className="flex flex-col items-center p-2 card-inset">
-                <span className="text-white font-bold">{totalProtein}g</span>
-                <span className="text-[8px] text-zinc-500 uppercase tracking-wider mt-0.5 font-semibold">Protein</span>
+      <AnimatePresence mode="wait">
+        {isLoading ? (
+          <motion.div key="loading" className="space-y-3" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-16 w-full" />
+            <Skeleton className="h-16 w-full" />
+          </motion.div>
+        ) : items.length === 0 ? (
+          <Card key="empty" variants={cardIn} initial="hidden" animate="show" className="flex flex-col items-center text-center py-8">
+            <motion.span
+              animate={{ rotate: [0, -8, 8, 0] }}
+              transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+              className="text-3xl mb-2"
+              role="img"
+              aria-hidden
+            >
+              🗓️
+            </motion.span>
+            <p className="text-sm font-extrabold text-fg-base">Nothing logged</p>
+            <p className="text-[11px] text-fg-dim font-bold mt-1">Pick another day from the calendar.</p>
+          </Card>
+        ) : (
+          <motion.div
+            key={dateString}
+            variants={stagger(0.05)}
+            initial="hidden"
+            animate="show"
+            className="space-y-3"
+          >
+            {/* Daily summary */}
+            <Card variants={cardIn} className="space-y-3">
+              <div className="flex justify-between items-baseline">
+                <span className="text-[11px] font-extrabold text-fg-dim uppercase tracking-wide">
+                  Daily summary
+                </span>
+                <span className="text-xl font-extrabold num text-accent">
+                  <CountUp value={totalCalories} suffix=" kcal" />
+                </span>
               </div>
-              <div className="flex flex-col items-center p-2 card-inset">
-                <span className="text-white font-bold">{totalCarbs}g</span>
-                <span className="text-[8px] text-zinc-500 uppercase tracking-wider mt-0.5 font-semibold">Carbs</span>
-              </div>
-              <div className="flex flex-col items-center p-2 card-inset">
-                <span className="text-white font-bold">{totalFats}g</span>
-                <span className="text-[8px] text-zinc-500 uppercase tracking-wider mt-0.5 font-semibold">Fat</span>
-              </div>
-              <div className="flex flex-col items-center p-2 card-inset">
-                <span className="text-white font-bold">{totalFiber}g</span>
-                <span className="text-[8px] text-zinc-500 uppercase tracking-wider mt-0.5 font-semibold">Fiber</span>
-              </div>
-              <div className="flex flex-col items-center p-2 card-inset">
-                <span className="text-white font-bold">{totalSugar}g</span>
-                <span className="text-[8px] text-zinc-500 uppercase tracking-wider mt-0.5 font-semibold">Sugar</span>
-              </div>
-            </div>
-          </div>
 
-          {/* Food Log Table */}
-          <div className="card overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-[10px] sm:text-xs num">
-                <thead>
-                  <tr className="bg-zinc-950 border-b border-zinc-800">
-                    <th className="px-3 py-2.5 text-[9px] font-bold text-zinc-500 uppercase tracking-wider whitespace-nowrap">Food</th>
-                    <th className="px-2 py-2.5 text-[9px] font-bold text-zinc-500 uppercase tracking-wider whitespace-nowrap">Qty</th>
-                    <th className="px-2 py-2.5 text-[9px] font-bold text-zinc-500 uppercase tracking-wider whitespace-nowrap text-right">Cal</th>
-                    <th className="px-2 py-2.5 text-[9px] font-bold text-zinc-500 uppercase tracking-wider whitespace-nowrap text-right">Protein</th>
-                    <th className="px-2 py-2.5 text-[9px] font-bold text-zinc-500 uppercase tracking-wider whitespace-nowrap text-right">Carbs</th>
-                    <th className="px-2 py-2.5 text-[9px] font-bold text-zinc-500 uppercase tracking-wider whitespace-nowrap text-right">Fat</th>
-                    <th className="px-2 py-2.5 text-[9px] font-bold text-zinc-500 uppercase tracking-wider whitespace-nowrap text-right">Fiber</th>
-                    <th className="px-2 py-2.5 text-[9px] font-bold text-zinc-500 uppercase tracking-wider whitespace-nowrap text-right">Sugar</th>
-                    <th className="px-2 py-2.5 text-[9px] font-bold text-zinc-500 uppercase tracking-wider whitespace-nowrap text-right">Time</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((item, idx) => (
-                    <tr
-                      key={item.id}
-                      className={`border-b border-zinc-800/60 transition-colors duration-100 hover:bg-zinc-800/40 ${
-                        idx % 2 === 0 ? 'bg-zinc-900' : 'bg-zinc-950/60'
-                      }`}
-                    >
-                      <td className="px-3 py-2 text-zinc-200 font-semibold capitalize whitespace-nowrap max-w-[120px] truncate" title={item.name}>
-                        {item.name}
-                      </td>
-                      <td className="px-2 py-2 text-zinc-500 whitespace-nowrap">
-                        {item.quantity} {item.unit}
-                      </td>
-                      <td className="px-2 py-2 text-white font-bold text-right whitespace-nowrap">
-                        {item.calories}
-                      </td>
-                      <td className="px-2 py-2 text-zinc-400 text-right whitespace-nowrap">
-                        {item.protein}g
-                      </td>
-                      <td className="px-2 py-2 text-zinc-400 text-right whitespace-nowrap">
-                        {item.carbs}g
-                      </td>
-                      <td className="px-2 py-2 text-zinc-400 text-right whitespace-nowrap">
-                        {item.fats}g
-                      </td>
-                      <td className="px-2 py-2 text-zinc-400 text-right whitespace-nowrap">
-                        {item.fiber || 0}g
-                      </td>
-                      <td className="px-2 py-2 text-zinc-400 text-right whitespace-nowrap">
-                        {item.sugar || 0}g
-                      </td>
-                      <td className="px-2 py-2 text-zinc-500 text-right whitespace-nowrap">
-                        {formatLoggedTime(item.createdAt)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="grid grid-cols-5 gap-1.5">
+                {SUMMARY_TILES.map((tile) => (
+                  <div
+                    key={tile.key}
+                    className="flex flex-col items-center py-2 px-1 rounded-xl"
+                    style={{ backgroundColor: `${tile.color}14` }}
+                  >
+                    <span className="text-xs font-extrabold num" style={{ color: tile.color }}>
+                      {totals[tile.key]}g
+                    </span>
+                    <span className="text-[8px] text-fg-dim uppercase tracking-wide mt-0.5 font-extrabold">
+                      {tile.label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+
+            {/* Timeline of entries */}
+            <div className="relative pl-4">
+              {/* The spine */}
+              <div className="absolute left-[5px] top-2 bottom-2 w-0.5 bg-surface-raised rounded-full" />
+
+              <div className="space-y-2.5">
+                {items.map((item) => (
+                  <motion.div key={item.id} variants={listItem} className="relative">
+                    <motion.span
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ delay: 0.1 }}
+                      className="absolute -left-4 top-4 w-2.5 h-2.5 rounded-full grad-accent ring-4 ring-surface-card"
+                    />
+
+                    <div className="card p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p
+                            className="text-xs font-extrabold text-fg-strong capitalize truncate"
+                            title={item.name}
+                          >
+                            {item.name}
+                          </p>
+                          <p className="text-[10px] text-fg-dim font-bold num mt-0.5">
+                            {item.quantity} {item.unit} · {formatLoggedTime(item.createdAt)}
+                          </p>
+                        </div>
+                        <span className="chip bg-white/[0.06] text-accent px-2 py-0.5 text-[10px] num shrink-0">
+                          {item.calories} kcal
+                        </span>
+                      </div>
+
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {[
+                          { l: 'P', v: item.protein, c: '#FFFFFF' },
+                          { l: 'C', v: item.carbs, c: '#DCDCE0' },
+                          { l: 'F', v: item.fats, c: '#B8B8C0' },
+                          { l: 'S', v: item.sugar || 0, c: '#9A9AA3' },
+                          { l: 'Fib', v: item.fiber || 0, c: '#7E7E88' },
+                        ].map((m) => (
+                          <span
+                            key={m.l}
+                            className={cx('chip px-1.5 py-0.5 text-[9px]')}
+                            style={{ backgroundColor: `${m.c}14`, color: m.c }}
+                          >
+                            {m.l} {m.v}g
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
             </div>
-          </div>
-        </div>
-      )}
-    </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 };
