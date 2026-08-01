@@ -1,5 +1,8 @@
-import React from 'react';
-import { Zap, Flame } from 'lucide-react';
+import React, { useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import {Card, CountUp} from '../ui/primitives';
+import { cx } from '../ui/cx';
+import { cardIn, spring, stagger } from '../ui/motion';
 
 interface DayMetric {
   date: string;
@@ -10,19 +13,24 @@ interface HistoryStatsViewProps {
   streak: number;
   weeklyAverage: number;
   graphData: DayMetric[];
+  selectedDate?: string;
+  onSelectDay?: (date: string) => void;
 }
 
 export const HistoryStatsView: React.FC<HistoryStatsViewProps> = ({
   streak,
   weeklyAverage,
   graphData,
+  selectedDate,
+  onSelectDay,
 }) => {
+  const [hovered, setHovered] = useState<string | null>(null);
   const maxCalories = Math.max(1500, ...graphData.map((d) => d.calories));
 
   // Formats date to simple weekday letter/abbreviation (e.g., "M", "T")
   const getDayLabel = (dateStr: string) => {
     try {
-      const date = new Date(dateStr);
+      const date = new Date(dateStr + 'T00:00:00');
       const days = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
       return days[date.getDay()];
     } catch {
@@ -31,124 +39,123 @@ export const HistoryStatsView: React.FC<HistoryStatsViewProps> = ({
   };
 
   return (
-    <div className="w-full space-y-4 font-sans text-white">
-      {/* Metrics Row */}
-      {/* Metrics Row */}
-      <div className="grid grid-cols-2 gap-2 sm:gap-3.5">
-        {/* Streak card */}
-        <div className="p-3 sm:p-4 bg-zinc-950 border border-zinc-900 rounded-2xl flex items-center gap-2 sm:gap-3 shadow-inner">
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-orange-500/10 text-orange-400 border border-orange-500/20 flex items-center justify-center shrink-0">
-            <Zap className="w-5 h-5 sm:w-5.5 sm:h-5.5 fill-orange-400/20" />
-          </div>
+    <motion.div variants={stagger(0.06)} className="w-full space-y-3">
+      {/* Metrics */}
+      <div className="grid grid-cols-2 gap-3">
+        <Card variants={cardIn} padded={false} className="p-3.5 flex items-center gap-2.5" interactive>
+          <motion.div
+            animate={{ scale: [1, 1.08, 1] }}
+            transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+            className="w-10 h-10 rounded-2xl grad-tile flex items-center justify-center shrink-0 shadow-soft text-lg"
+            role="img"
+            aria-hidden
+          >
+            🔥
+          </motion.div>
           <div className="min-w-0">
-            <div className="text-[9px] sm:text-[10px] font-bold text-zinc-500 uppercase tracking-wider font-mono truncate">
+            <div className="text-[10px] font-extrabold text-fg-dim uppercase tracking-wide truncate">
               Streak
             </div>
-            <div className="flex items-baseline gap-1 mt-0.5 flex-wrap">
-              <span className="text-lg sm:text-xl font-bold font-mono text-white leading-tight">{streak}</span>
-              <span className="text-[10px] sm:text-xs text-zinc-400 font-medium">days</span>
+            <div className="flex items-baseline gap-1">
+              <span className="text-xl font-extrabold num text-fg-strong leading-tight">
+                <CountUp value={streak} />
+              </span>
+              <span className="text-[11px] text-fg-dim font-bold">days</span>
             </div>
           </div>
-        </div>
+        </Card>
 
-        {/* Weekly average card */}
-        <div className="p-3 sm:p-4 bg-zinc-950 border border-zinc-900 rounded-2xl flex items-center gap-2 sm:gap-3 shadow-inner">
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#FF7E67]/10 text-[#FF7E67] border border-[#FF7E67]/20 flex items-center justify-center shrink-0">
-            <Flame className="w-5 h-5 sm:w-5.5 sm:h-5.5 fill-[#FF7E67]/20" />
+        <Card variants={cardIn} padded={false} className="p-3.5 flex items-center gap-2.5" interactive>
+          {/* Icon tiles stay uniformly dark — the white surface is reserved for
+              active/primary states so it keeps its meaning. */}
+          <div className="w-10 h-10 rounded-2xl grad-tile flex items-center justify-center shrink-0 shadow-soft text-lg" role="img" aria-hidden>
+            📊
           </div>
           <div className="min-w-0">
-            <div className="text-[9px] sm:text-[10px] font-bold text-zinc-500 uppercase tracking-wider font-mono truncate">
-              Avg Calories
+            <div className="text-[10px] font-extrabold text-fg-dim uppercase tracking-wide truncate">
+              Daily avg
             </div>
-            <div className="flex items-baseline gap-0.5 sm:gap-1 mt-0.5 flex-wrap">
-              <span className="text-lg sm:text-xl font-bold font-mono text-white leading-tight">{weeklyAverage}</span>
-              <span className="text-[9px] sm:text-[10px] text-zinc-400 font-medium font-mono uppercase">kcal/d</span>
+            <div className="flex items-baseline gap-1">
+              <span className="text-xl font-extrabold num text-fg-strong leading-tight">
+                <CountUp value={weeklyAverage} />
+              </span>
+              <span className="text-[10px] text-fg-dim font-bold">kcal</span>
             </div>
           </div>
-        </div>
+        </Card>
       </div>
 
-      {/* SVG Calorie Graph Card */}
-      <div className="p-3 sm:p-4 bg-zinc-950 border border-zinc-900 rounded-2xl space-y-3.5 shadow-inner">
-        <div className="flex justify-between items-center px-1">
-          <span className="text-[10px] font-black text-zinc-500 uppercase tracking-wider font-mono">
-            Calorie Intake (Last 7 Days)
-          </span>
-          <span className="text-[9px] font-bold bg-zinc-900 text-zinc-400 px-2 py-0.5 rounded-full border border-zinc-800">
-            Past Week
-          </span>
+      {/* Chart */}
+      <Card variants={cardIn} className="space-y-3">
+        <div className="flex justify-between items-center">
+          <span className="text-xs font-extrabold text-fg-base">Calorie intake</span>
+          <span className="chip bg-surface-inset text-fg-muted px-2.5 py-1 text-[10px]">Last 7 days</span>
         </div>
 
-        {/* SVG Graph rendering */}
-        <div className="relative pt-2">
-          {graphData.length === 0 ? (
-            <div className="h-[100px] flex items-center justify-center text-zinc-500 text-xs font-mono">
-              No stats available
-            </div>
-          ) : (
-            <div className="w-full flex flex-col gap-2">
-              <svg viewBox="0 0 300 120" className="w-full h-28 text-zinc-800">
-                {/* Grid Lines */}
-                <line x1="10" y1="20" x2="290" y2="20" stroke="rgba(255, 255, 255, 0.05)" strokeDasharray="3,3" />
-                <line x1="10" y1="55" x2="290" y2="55" stroke="rgba(255, 255, 255, 0.05)" strokeDasharray="3,3" />
-                <line x1="10" y1="90" x2="290" y2="90" stroke="rgba(255, 255, 255, 0.05)" strokeDasharray="3,3" />
+        {graphData.length === 0 ? (
+          <div className="h-[120px] flex items-center justify-center text-fg-dim text-xs font-bold">
+            No stats yet
+          </div>
+        ) : (
+          <div className="flex items-end justify-between gap-1.5 h-[136px] pt-6 relative">
+            {graphData.map((day, idx) => {
+              const ratio = maxCalories > 0 ? day.calories / maxCalories : 0;
+              const isToday = idx === graphData.length - 1;
+              const isSelected = selectedDate === day.date;
+              const isActive = isSelected || hovered === day.date;
 
-                {/* Bars */}
-                {graphData.map((day, idx) => {
-                  const x = 20 + idx * 38;
-                  const barHeight = maxCalories > 0 ? (day.calories / maxCalories) * 85 : 0;
-                  const y = 95 - barHeight;
-                  const isToday = idx === 6;
-
-                  return (
-                    <g key={day.date} className="group cursor-pointer">
-                      {/* Interactive Bar */}
-                      <rect
-                        x={x}
-                        y={y}
-                        width="20"
-                        height={Math.max(2, barHeight)}
-                        rx="4"
-                        fill={isToday ? '#FF7E67' : 'rgba(255, 255, 255, 0.15)'}
-                        className="transition-all duration-300 hover:fill-white/80"
-                      />
-
-                      {/* Calorie Text Tooltip (Visible on hover / standard top) */}
-                      {day.calories > 0 && (
-                        <text
-                          x={x + 10}
-                          y={y - 5}
-                          textAnchor="middle"
-                          fontSize="8"
-                          fill="rgba(255, 255, 255, 0.6)"
-                          className="font-mono font-bold opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                        >
-                          {day.calories}
-                        </text>
-                      )}
-
-                      {/* Day Label */}
-                      <text
-                        x={x + 10}
-                        y="112"
-                        textAnchor="middle"
-                        fontSize="9"
-                        fill={isToday ? '#FF7E67' : 'rgba(255, 255, 255, 0.4)'}
-                        className="font-mono font-black"
+              return (
+                <button
+                  key={day.date}
+                  onClick={() => onSelectDay?.(day.date)}
+                  onMouseEnter={() => setHovered(day.date)}
+                  onMouseLeave={() => setHovered(null)}
+                  className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end group touch-manipulation"
+                  aria-label={`${day.date}: ${day.calories} kcal`}
+                >
+                  {/* Tooltip */}
+                  <AnimatePresence>
+                    {isActive && day.calories > 0 && (
+                      <motion.span
+                        initial={{ opacity: 0, y: 6, scale: 0.85 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 4, scale: 0.9 }}
+                        transition={spring}
+                        className="absolute top-0 px-2 py-1 rounded-lg bg-accent text-surface-base
+                                   text-[10px] font-extrabold num shadow-glow pointer-events-none z-10"
                       >
-                        {getDayLabel(day.date)}
-                      </text>
-                    </g>
-                  );
-                })}
+                        {day.calories} kcal
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
 
-                {/* Bottom Baseline */}
-                <line x1="10" y1="96" x2="290" y2="96" stroke="rgba(255, 255, 255, 0.1)" strokeWidth="1" />
-              </svg>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+                  {/* Bar */}
+                  <motion.div
+                    className={cx(
+                      'w-full rounded-t-xl rounded-b-md origin-bottom',
+                      isSelected ? 'grad-accent' : isToday ? 'bg-accent-dim' : 'bg-surface-raised group-hover:bg-white/[0.14]'
+                    )}
+                    style={{ minHeight: 4 }}
+                    initial={{ height: 0 }}
+                    animate={{ height: `${Math.max(3, ratio * 100)}%` }}
+                    transition={{ duration: 0.7, delay: idx * 0.05, ease: [0.22, 1, 0.36, 1] }}
+                    whileHover={{ scaleY: 1.04 }}
+                  />
+
+                  <span
+                    className={cx(
+                      'text-[10px] font-extrabold shrink-0',
+                      isSelected ? 'text-accent' : isToday ? 'text-fg-base' : 'text-fg-faint'
+                    )}
+                  >
+                    {getDayLabel(day.date)}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </Card>
+    </motion.div>
   );
 };

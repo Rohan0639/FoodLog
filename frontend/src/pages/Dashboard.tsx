@@ -1,143 +1,76 @@
-import { useState, useEffect, useRef } from 'react';
-import type { Message, DailyGoal, OfflineAction, FoodEntry, ParsedItem } from '../types';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import type { FoodEntry, GeminiResponse, Message, ParsedItem } from '../types';
 import { scaleMacrosByQuantity } from '../utils/unitConverter';
 import confetti from 'canvas-confetti';
-import { supabase } from '../lib/supabase';
-import { analyzeFoodClient } from '../utils/geminiParser';
 import { analyzeFoodServer } from '../utils/serverParser';
-
-const USE_BACKEND = true;
+import { chatService, goalService, parseCacheService, settingsService } from '../lib/services';
+import { newId } from '../lib/storage/schema';
+import { getCurrentIsoString, getTodayDate, msUntilMidnight } from '../utils/date';
+import { useChatMessages } from '../hooks/useChatMessages';
+import { useFoodLog } from '../hooks/useFoodLog';
+import { useOnlineStatus } from '../hooks/useOnlineStatus';
+import { useDbRevision } from '../hooks/useDbRevision';
 import Navbar from '../components/Navbar';
 import FoodLogger from '../components/FoodLogger';
 import { NutritionDashboard } from '../components/NutritionDashboard';
-import type { User } from '@supabase/supabase-js';
+import { Blobs, ConfirmDialog } from '../ui/primitives';
+import { spring } from '../ui/motion';
+import { MessageCircle, BarChart2, Trash2 } from 'lucide-react';
 
-const DEFAULT_DAILY_GOAL: DailyGoal = {
-  calories: 2000,
-  protein: 135,
-  carbs: 230,
-  fat: 70,
-  sugar: 50,
-  fiber: 30,
-};
+// Opened from the navbar, so it is never needed on first paint.
+const SettingsSheet = lazy(() =>
+  import('../components/SettingsSheet').then((m) => ({ default: m.SettingsSheet }))
+);
 
-const generateMessageId = (sender: string): string => {
-  return `${sender}-${crypto.randomUUID()}`;
-};
+const generateMessageId = (sender: string): string => `${sender}-${newId()}`;
 
-const generateTempId = (): string => {
-  return `temp-${crypto.randomUUID()}`;
-};
+/**
+ * Parses a phrase into food items.
+ *
+ * Checks the local cache first, so a phrase logged before resolves instantly
+ * and works with no connection. Only successful parses are cached.
+ */
+async function analyzeFood(text: string): Promise<GeminiResponse> {
+  const cached = parseCacheService.getCachedParse(text);
+  if (cached) return cached;
 
-const getCurrentDate = (): Date => {
-  return new Date();
-};
-
-const getCurrentIsoString = (): string => {
-  return new Date().toISOString();
-};
-
-const getLocalIsoDate = (d: Date = new Date()): string => {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
-const parseLocalDateString = (timestamp: string): string => {
-  if (!timestamp || typeof timestamp !== 'string') {
-    return getLocalIsoDate();
-  }
-  if (/^\d{4}-\d{2}-\d{2}$/.test(timestamp)) {
-    return timestamp;
-  }
-  try {
-    const d = new Date(timestamp);
-    if (!isNaN(d.getTime())) {
-      return getLocalIsoDate(d);
-    }
-  } catch (e) {}
-  return timestamp.split('T')[0] || getLocalIsoDate();
-};
-
-function getTodayDate(): string {
-  return getLocalIsoDate();
+  const result = await analyzeFoodServer(text);
+  parseCacheService.setCachedParse(text, result);
+  return result;
 }
 
-interface DashboardProps {
-  user: User;
-  onLogout: () => void;
-}
+const TABS = [
+  { id: 'log' as const, label: 'Log', icon: MessageCircle },
+  { id: 'progress' as const, label: 'Progress', icon: BarChart2 },
+];
 
-export default function Dashboard({ user, onLogout }: DashboardProps) {
-  const [messages, setMessages] = useState<Message[]>(() => {
-    const todayStr = getTodayDate();
-    const welcome: Message = {
-      id: 'welcome',
-      sender: 'bot',
-      text: "Hello! I'm your digital food diary assistant. Tell me what you ate today (e.g., \"I had 2 bananas and 3 eggs\") and I'll analyze and log the nutrients for you.",
-      timestamp: new Date(),
-    };
-    try {
-      const saved = localStorage.getItem(`chat_messages_${user.id}_${todayStr}`);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map((m: any) => ({
-            ...m,
-            timestamp: new Date(m.timestamp)
-          }));
-        }
-      }
-    } catch (e) {
-      console.error('Failed to parse cached chat messages', e);
-    }
-    return [welcome];
-  });
-  const [logs, setLogs] = useState<FoodEntry[]>([]);
-  const [dailyGoal] = useState<DailyGoal>(DEFAULT_DAILY_GOAL);
+export default function Dashboard() {
   const [todayDateStr, setTodayDateStr] = useState<string>(getTodayDate());
-  const [isOnline, setIsOnline] = useState<boolean | null>(null); // null = checking
+  const revision = useDbRevision();
+  const isOnline = useOnlineStatus();
+
+  const { messages, setMessages } = useChatMessages(todayDateStr);
+  const { logs, addEntries, updateEntry, deleteEntry, clearDay } = useFoodLog(todayDateStr);
+
+  // `revision` is a cache key: goals are re-read whenever the store changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const dailyGoal = useMemo(() => goalService.getDailyGoal(), [revision]);
 
   const [isBotTyping, setIsBotTyping] = useState(false);
-  const [isDashboardOpenMobile, setIsDashboardOpenMobile] = useState(false);
+  // Mobile app-style navigation: 'log' = chat screen, 'progress' = stats/history screen
+  const [mobileTab, setMobileTab] = useState<'log' | 'progress'>('log');
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [confirmClearOpen, setConfirmClearOpen] = useState(false);
 
-  const [activeFoods, setActiveFoods] = useState<FoodEntry[]>(() => {
-    const todayStr = getTodayDate();
-    try {
-      const saved = localStorage.getItem(`chat_messages_${user.id}_${todayStr}`);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          const pendingMsg = parsed.find((m: any) => m.pendingFoods && m.pendingFoods.length > 0);
-          if (pendingMsg && pendingMsg.pendingFoods) {
-            return pendingMsg.pendingFoods;
-          }
-        }
-      }
-    } catch (e) {
-      console.error('Failed to parse active foods from cache', e);
-    }
-    return [];
-  });
-  const [activeReviewMessageId, setActiveReviewMessageId] = useState<string | null>(() => {
-    const todayStr = getTodayDate();
-    try {
-      const saved = localStorage.getItem(`chat_messages_${user.id}_${todayStr}`);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          const pendingMsg = parsed.find((m: any) => m.pendingFoods && m.pendingFoods.length > 0);
-          if (pendingMsg) {
-            return pendingMsg.id;
-          }
-        }
-      }
-    } catch (e) {
-      console.error('Failed to parse active review message ID from cache', e);
-    }
-    return null;
-  });
+  // An unconfirmed review table survives a reload: it is only committed when
+  // the user confirms, so it is restored from the persisted transcript.
+  const [activeFoods, setActiveFoods] = useState<FoodEntry[]>(
+    () => chatService.getPendingReview(getTodayDate())?.foods ?? []
+  );
+  const [activeReviewMessageId, setActiveReviewMessageId] = useState<string | null>(
+    () => chatService.getPendingReview(getTodayDate())?.messageId ?? null
+  );
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -150,405 +83,82 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
     scrollToBottom();
   }, [messages, isBotTyping]);
 
-  // Clean up old days' chat history for the user to keep localStorage clean
+  // Daily reset at midnight: re-arms itself so the app can stay open for days.
   useEffect(() => {
-    const todayStr = getTodayDate();
-    const prefix = `chat_messages_${user.id}_`;
-    try {
-      const keysToRemove: string[] = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith(prefix) && key !== `${prefix}${todayStr}`) {
-          keysToRemove.push(key);
-        }
-      }
-      keysToRemove.forEach((key) => localStorage.removeItem(key));
-    } catch (e) {
-      console.warn('Failed to clean up old chat logs from localStorage:', e);
-    }
-  }, [user.id]);
+    let timeoutId: ReturnType<typeof setTimeout>;
 
-  // Save messages to localStorage whenever they change
-  useEffect(() => {
-    const todayStr = getTodayDate();
-    localStorage.setItem(`chat_messages_${user.id}_${todayStr}`, JSON.stringify(messages));
-  }, [messages, user.id]);
-
-  // Load logs from Supabase on start
-  useEffect(() => {
-    const checkConnectionAndLoadLogs = async () => {
-      try {
-        const todayStr = getTodayDate();
-        // Relying on RLS: We select * and do not manually filter by user_id
-        const { data, error } = await supabase
-          .from('food_logs')
-          .select('*')
-          .eq('date', todayStr)
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
-
-        const mappedData = (data || []).map((item: any) => ({
-          id: item.id,
-          name: item.name,
-          quantity: item.quantity,
-          unit: item.unit,
-          calories: item.calories,
-          protein: item.protein,
-          carbs: item.carbs,
-          fats: item.fats,
-          sugar: item.sugar || 0,
-          fiber: item.fiber || 0,
-          createdAt: item.created_at
-        }));
-
-        setIsOnline(true);
-        setLogs(mappedData);
-        localStorage.setItem(`food_logs_local_${user.id}`, JSON.stringify(mappedData));
-      } catch (err) {
-        console.warn('Unable to fetch logs from Supabase. Falling back to local cache.', err);
-        setIsOnline(false);
-        const cached = localStorage.getItem(`food_logs_local_${user.id}`);
-        if (cached) {
-          try {
-            const allCached = JSON.parse(cached);
-            const todayStr = getTodayDate();
-            const filtered = allCached.filter((log: FoodEntry) => {
-              const logDate = log.createdAt ? parseLocalDateString(log.createdAt) : '';
-              return logDate === todayStr;
-            });
-            setLogs(filtered);
-          } catch (e) {
-            console.error('Failed to parse cached logs', e);
-          }
-        }
-      }
-    };
-
-    checkConnectionAndLoadLogs();
-  }, [user.id]);
-
-  // Daily Reset at Midnight
-  useEffect(() => {
-    let timeoutId: any;
-
-    const setupMidnightTimer = () => {
-      const now = new Date();
-      const midnight = new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        now.getDate() + 1,
-        0, 0, 0, 0
-      );
-      const msToMidnight = midnight.getTime() - now.getTime();
-
+    const armMidnightTimer = () => {
       timeoutId = setTimeout(() => {
-        handleMidnightReset();
-        setupMidnightTimer();
-      }, msToMidnight);
+        setTodayDateStr(getTodayDate());
+        armMidnightTimer();
+      }, msUntilMidnight());
     };
 
-    const handleMidnightReset = async () => {
-      const welcome: Message = {
-        id: 'welcome',
-        sender: 'bot',
-        text: "Hello! I'm your digital food diary assistant. Tell me what you ate today (e.g., \"I had 2 bananas and 3 eggs\") and I'll analyze and log the nutrients for you.",
-        timestamp: new Date(),
-      };
-      const resetMessage: Message = {
+    armMidnightTimer();
+    return () => clearTimeout(timeoutId);
+  }, []);
+
+  // Announces the rollover once the new day's (empty) transcript has loaded.
+  // Runs after the chat hook has swapped days, so the notice is not clobbered.
+  const previousDate = useRef(todayDateStr);
+  useEffect(() => {
+    if (previousDate.current === todayDateStr) return;
+    previousDate.current = todayDateStr;
+
+    setActiveFoods([]);
+    setActiveReviewMessageId(null);
+    setMessages((prev) => [
+      ...prev,
+      {
         id: `bot-midnight-reset-${Date.now()}`,
         sender: 'bot',
-        text: "Midnight reached! A new logging day has started. ☀️ Your previous logs are saved in history.",
+        text: 'Midnight reached! A new logging day has started. ☀️ Your previous logs are saved in history.',
         timestamp: new Date(),
-      };
-      setMessages([welcome, resetMessage]);
-
-      const todayStr = getTodayDate();
-      setTodayDateStr(todayStr);
-
-      if (isOnline) {
-        try {
-          const { data, error } = await supabase
-            .from('food_logs')
-            .select('*')
-            .eq('date', todayStr)
-            .order('created_at', { ascending: false });
-
-          if (!error && data) {
-            const mappedData = data.map((item: any) => ({
-              id: item.id,
-              name: item.name,
-              quantity: item.quantity,
-              unit: item.unit,
-              calories: item.calories,
-              protein: item.protein,
-              carbs: item.carbs,
-              fats: item.fats,
-              sugar: item.sugar || 0,
-              fiber: item.fiber || 0,
-              createdAt: item.created_at
-            }));
-            setLogs(mappedData);
-            localStorage.setItem(`food_logs_local_${user.id}`, JSON.stringify(mappedData));
-            return;
-          }
-        } catch (err) {
-          console.warn('[Timer] Failed to fetch new logs from Supabase after midnight:', err);
-        }
-      }
-
-      setLogs([]);
-    };
-
-    setupMidnightTimer();
-
-    return () => {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-    };
-  }, [isOnline, user.id]);
-
-  // Synchronize offline actions when network is available
-  const syncOfflineActions = async () => {
-    if (!navigator.onLine) return;
-    const actionsJson = localStorage.getItem(`offline_pending_actions_${user.id}`);
-    if (!actionsJson) return;
-
-    let actions: OfflineAction[];
-    try {
-      actions = JSON.parse(actionsJson);
-    } catch (e) {
-      console.error('Failed to parse offline actions', e);
-      return;
-    }
-
-    if (actions.length === 0) return;
-
-    console.log(`[Sync] Starting sync of ${actions.length} offline actions...`);
-    const remainingActions: OfflineAction[] = [...actions];
-
-    for (const action of actions) {
-      try {
-        if (action.type === 'ADD') {
-          let entriesToSave;
-          if (action.parsedEntries && action.parsedEntries.length > 0) {
-            entriesToSave = action.parsedEntries.map((item: FoodEntry) => {
-              const timestamp = item.createdAt || action.timestamp || new Date().toISOString();
-              return {
-                id: item.id || crypto.randomUUID(),
-                name: item.name || 'Unknown',
-                quantity: item.quantity,
-                unit: item.unit,
-                calories: item.calories || 0,
-                protein: item.protein || 0,
-                carbs: item.carbs || 0,
-                fats: item.fats || 0,
-                sugar: item.sugar || 0,
-                fiber: item.fiber || 0,
-                created_at: timestamp,
-                date: parseLocalDateString(timestamp),
-                user_id: user.id
-              };
-            });
-          } else {
-            const parseData = USE_BACKEND
-              ? await analyzeFoodServer(action.text!)
-              : await analyzeFoodClient(action.text!);
-
-            if (parseData.status === 'invalid') {
-              setLogs((prev) => prev.filter((item) => item.id !== action.tempId));
-              remainingActions.shift();
-              continue;
-            }
-            const items = parseData.items || [];
-            entriesToSave = items.map((item: ParsedItem) => {
-              const rawQty = parseFloat(item.quantity) || 1;
-              const rawUnit = item.quantity.replace(/^\d+(?:\.\d+)?\s*/, '') || 'piece';
-              const timestamp = action.timestamp || new Date().toISOString();
-              return {
-                id: crypto.randomUUID(),
-                name: item.name || 'Unknown',
-                quantity: rawQty,
-                unit: rawUnit,
-                calories: item.calories || 0,
-                protein: item.protein || 0,
-                carbs: item.carbs || 0,
-                fats: item.fat || 0,
-                sugar: item.sugar || 0,
-                fiber: item.fiber || 0,
-                created_at: timestamp,
-                date: parseLocalDateString(timestamp),
-                user_id: user.id
-              };
-            });
-          }
-
-          const { error } = await supabase.from('food_logs').insert(entriesToSave);
-          if (!error) {
-            const localEntries = entriesToSave.map((item: any) => ({
-              id: item.id,
-              name: item.name,
-              quantity: item.quantity,
-              unit: item.unit,
-              calories: item.calories,
-              protein: item.protein,
-              carbs: item.carbs,
-              fats: item.fats,
-              sugar: item.sugar,
-              fiber: item.fiber,
-              createdAt: item.created_at
-            }));
-            setLogs((prev) => {
-              const idx = prev.findIndex((item) => item.id === action.tempId);
-              if (idx !== -1) {
-                const updated = [...prev];
-                updated.splice(idx, 1, ...localEntries);
-                return updated;
-              }
-              return [...localEntries, ...prev];
-            });
-            remainingActions.shift();
-          } else {
-            break;
-          }
-        } else if (action.type === 'EDIT' && action.entry) {
-          const { error } = await supabase
-            .from('food_logs')
-            .update({
-              name: action.entry.name,
-              quantity: action.entry.quantity,
-              unit: action.entry.unit,
-              calories: action.entry.calories,
-              protein: action.entry.protein,
-              carbs: action.entry.carbs,
-              fats: action.entry.fats,
-              sugar: action.entry.sugar || 0,
-              fiber: action.entry.fiber || 0
-            })
-            .eq('id', action.id);
-
-          if (!error) {
-            remainingActions.shift();
-          } else {
-            break;
-          }
-        } else if (action.type === 'DELETE') {
-          const { error } = await supabase
-            .from('food_logs')
-            .delete()
-            .eq('id', action.id);
-
-          if (!error) {
-            remainingActions.shift();
-          } else {
-            break;
-          }
-        }
-      } catch (err) {
-        console.error('Failed to sync action:', action, err);
-        break;
-      }
-    }
-
-    localStorage.setItem(`offline_pending_actions_${user.id}`, JSON.stringify(remainingActions));
-
-    if (remainingActions.length === 0) {
-      console.log('[Sync] All offline actions synced successfully.');
-      try {
-        const todayStr = getTodayDate();
-        const { data, error } = await supabase
-          .from('food_logs')
-          .select('*')
-          .eq('date', todayStr)
-          .order('created_at', { ascending: false });
-
-        if (!error && data) {
-          const mappedData = data.map((item: any) => ({
-            id: item.id,
-            name: item.name,
-            quantity: item.quantity,
-            unit: item.unit,
-            calories: item.calories,
-            protein: item.protein,
-            carbs: item.carbs,
-            fats: item.fats,
-            sugar: item.sugar || 0,
-            fiber: item.fiber || 0,
-            createdAt: item.created_at
-          }));
-          setLogs(mappedData);
-          localStorage.setItem(`food_logs_local_${user.id}`, JSON.stringify(mappedData));
-        }
-      } catch (err) {
-        console.error('Failed to refresh logs after sync', err);
-      }
-    }
-  };
-
-  useEffect(() => {
-    const handleOnline = () => {
-      setIsOnline(true);
-      syncOfflineActions();
-    };
-    const handleOffline = () => {
-      setIsOnline(false);
-    };
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    setTimeout(syncOfflineActions, 0);
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, [user.id]);
+      },
+    ]);
+  }, [todayDateStr, setMessages]);
 
   const handleSendMessage = async (text: string) => {
-    const cleanText = text.toLowerCase().trim().replace(/[.,/#!$%^&*;:{}=_`~()?-]/g, "");
-
-    if (cleanText === 'clear' || cleanText === 'reset') {
-      const userMsg: Message = {
-        id: generateMessageId('user'),
-        sender: 'user',
-        text,
-        timestamp: getCurrentDate(),
-      };
-      setMessages((prev) => [...prev, userMsg]);
-      handleClearAll();
-      return;
-    }
+    const cleanText = text.toLowerCase().trim().replace(/[.,/#!$%^&*;:{}=_`~()?-]/g, '');
 
     const userMsg: Message = {
       id: generateMessageId('user'),
       sender: 'user',
       text,
-      timestamp: getCurrentDate(),
+      timestamp: new Date(),
     };
-    
+
+    if (cleanText === 'clear' || cleanText === 'reset') {
+      setMessages((prev) => [...prev, userMsg]);
+      handleClearAll();
+      return;
+    }
+
     setMessages((prev) => [...prev, userMsg]);
     setIsBotTyping(true);
 
     try {
-      const parseData = USE_BACKEND
-        ? await analyzeFoodServer(text)
-        : await analyzeFoodClient(text);
+      const parseData = await analyzeFood(text);
+
       if (parseData.status === 'invalid') {
-        const botMsg: Message = {
-          id: generateMessageId('bot'),
-          sender: 'bot',
-          text: parseData.reason || "Input is not a valid food item",
-          timestamp: getCurrentDate(),
-        };
-        setMessages((prev) => [...prev, botMsg]);
-        setIsBotTyping(false);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: generateMessageId('bot'),
+            sender: 'bot',
+            text: parseData.reason || 'Input is not a valid food item',
+            timestamp: new Date(),
+          },
+        ]);
         return;
       }
+
       const items = parseData.items || [];
       const newEntries: FoodEntry[] = items.map((item: ParsedItem) => {
         const rawQty = parseFloat(item.quantity) || 1;
         const rawUnit = item.quantity.replace(/^\d+(?:\.\d+)?\s*/, '') || 'piece';
         return {
-          id: crypto.randomUUID(),
+          id: newId(),
           name: item.name || 'Unknown',
           quantity: rawQty,
           unit: rawUnit,
@@ -560,7 +170,7 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
           fats: item.fat || 0,
           sugar: item.sugar || 0,
           fiber: item.fiber || 0,
-          createdAt: new Date().toISOString(),
+          createdAt: getCurrentIsoString(),
           baseFoodName: item.baseFoodName,
           caloriesPerUnit: item.caloriesPerUnit,
           proteinPerUnit: item.proteinPerUnit,
@@ -568,85 +178,51 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
           fatPerUnit: item.fatPerUnit,
           sugarPerUnit: item.sugarPerUnit,
           fiberPerUnit: item.fiberPerUnit,
-          aliases: item.aliases
+          aliases: item.aliases,
         };
       });
-      const replyText = parseData.reply || `Please review the parsed food items:`;
 
       const botMsgId = generateMessageId('bot');
-      const botMsg: Message = {
-        id: botMsgId,
-        sender: 'bot',
-        text: replyText,
-        timestamp: getCurrentDate(),
-        pendingFoods: newEntries.length > 0 ? newEntries : undefined,
-      };
-
-      setMessages((prev) => [...prev, botMsg]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: botMsgId,
+          sender: 'bot',
+          text: parseData.reply || 'Please review the parsed food items:',
+          timestamp: new Date(),
+          pendingFoods: newEntries.length > 0 ? newEntries : undefined,
+        },
+      ]);
 
       if (newEntries.length > 0) {
         setActiveReviewMessageId(botMsgId);
         setActiveFoods(newEntries);
       }
     } catch (error) {
-      const err = error as Error;
-      console.warn('Failed to analyze food. Saving raw input locally...', err);
-      
-      const tempId = generateTempId();
-      const offlineEntry: FoodEntry = {
-        id: tempId,
-        name: text,
-        quantity: 1,
-        unit: 'serving',
-        calories: 0,
-        protein: 0,
-        carbs: 0,
-        fats: 0,
-        sugar: 0,
-        fiber: 0,
-        createdAt: getCurrentIsoString(),
-        isOffline: true
-      };
-
-      setLogs((prev) => [offlineEntry, ...prev]);
-
-      try {
-        const existingActions: OfflineAction[] = JSON.parse(localStorage.getItem(`offline_pending_actions_${user.id}`) || '[]');
-        existingActions.push({
-          type: 'ADD',
-          tempId,
-          text,
-          timestamp: getCurrentIsoString()
-        });
-        localStorage.setItem(`offline_pending_actions_${user.id}`, JSON.stringify(existingActions));
-      } catch (storageErr) {
-        console.error('Failed to write offline action to localStorage:', storageErr);
-      }
-
-      const replyText = "Saved offline. Will analyze when online.";
-
-      const botMsg: Message = {
-        id: generateMessageId('bot-fallback'),
-        sender: 'bot',
-        text: replyText,
-        timestamp: getCurrentDate(),
-        parsedFoods: [],
-      };
-
-      setMessages((prev) => [...prev, botMsg]);
+      // Logging is local and always available, but *parsing* needs the AI
+      // service. Nothing is written when it cannot be reached — a placeholder
+      // row with zeroed macros would silently corrupt the day's totals.
+      console.warn('Failed to analyze food.', error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: generateMessageId('bot-error'),
+          sender: 'bot',
+          text: "I couldn't reach the food parser just now, so nothing was logged. Check your connection and try again.",
+          timestamp: new Date(),
+        },
+      ]);
     } finally {
       setIsBotTyping(false);
     }
   };
 
-  const handleConfirmLog = async () => {
+  const handleConfirmLog = () => {
     if (activeFoods.length === 0) return;
     setIsBotTyping(true);
 
-    let finalizedFoods: FoodEntry[] = [];
-
     try {
-      finalizedFoods = activeFoods.map((item: FoodEntry) => {
+      const finalizedFoods: FoodEntry[] = activeFoods.map((item: FoodEntry) => {
         const quantity = item.quantity;
         let scaled = {
           calories: item.calories,
@@ -654,9 +230,9 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
           carbs: item.carbs,
           fats: item.fats,
           sugar: item.sugar || 0,
-          fiber: item.fiber || 0
+          fiber: item.fiber || 0,
         };
-        
+
         if (quantity > 0 && !isNaN(quantity)) {
           try {
             const baseUnit = item.baseUnit || item.unit;
@@ -678,147 +254,55 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
           fats: scaled.fats,
           sugar: scaled.sugar,
           fiber: scaled.fiber,
-          createdAt: item.createdAt || new Date().toISOString()
+          createdAt: item.createdAt || getCurrentIsoString(),
         };
       });
 
-      const dbFoods = finalizedFoods.map((item: FoodEntry) => ({
-        id: item.id,
-        name: item.name,
-        quantity: item.quantity,
-        unit: item.unit,
-        calories: item.calories,
-        protein: item.protein,
-        carbs: item.carbs,
-        fats: item.fats,
-        sugar: item.sugar,
-        fiber: item.fiber,
-        created_at: item.createdAt,
-        date: parseLocalDateString(item.createdAt),
-        user_id: user.id // Automatically attach user_id
-      }));
+      const savedEntries = addEntries(finalizedFoods);
 
-      const { data: savedEntries, error } = await supabase
-        .from('food_logs')
-        .insert(dbFoods)
-        .select();
-
-      if (error) {
-        throw new Error(`Supabase batch save error: ${error.message}`);
+      if (settingsService.getSettings().confettiEnabled) {
+        confetti({
+          particleCount: 110,
+          spread: 75,
+          origin: { y: 0.8 },
+          scalar: 0.95,
+          colors: ['#FFFFFF', '#B8B8C0', '#7E7E88', '#DCDCE0', '#9A9AA3'],
+        });
       }
-
-      // Asynchronously upsert any newly learned base foods into macro_dictionary cache
-      (async () => {
-        for (const item of activeFoods) {
-          if (item.baseFoodName && item.baseUnit && typeof item.caloriesPerUnit === 'number') {
-            try {
-              const { error: dictError } = await supabase
-                .from('macro_dictionary')
-                .upsert({
-                  food_name: item.baseFoodName,
-                  base_unit: item.baseUnit,
-                  calories_per_unit: item.caloriesPerUnit,
-                  protein_per_unit: item.proteinPerUnit ?? 0,
-                  carbs_per_unit: item.carbsPerUnit ?? 0,
-                  fat_per_unit: item.fatPerUnit ?? 0,
-                  sugar_per_unit: item.sugarPerUnit ?? 0,
-                  fiber_per_unit: item.fiberPerUnit ?? 0,
-                  aliases: item.aliases || [item.baseFoodName]
-                }, { onConflict: 'food_name,base_unit' });
-
-              if (dictError) {
-                console.warn(`[Cache Database Write Warning] Failed to insert "${item.baseFoodName}" to macro_dictionary:`, dictError.message);
-              } else {
-                console.log(`[Cache Learned] Successfully added "${item.baseFoodName}" to macro_dictionary.`);
-              }
-            } catch (dbErr) {
-              console.warn('[Cache Database Write Error]', dbErr);
-            }
-          }
-        }
-      })();
-
-      const mappedSaved = (savedEntries || []).map((item: any) => ({
-        id: item.id,
-        name: item.name,
-        quantity: item.quantity,
-        unit: item.unit,
-        calories: item.calories,
-        protein: item.protein,
-        carbs: item.carbs,
-        fats: item.fats,
-        sugar: item.sugar || 0,
-        fiber: item.fiber || 0,
-        createdAt: item.created_at
-      }));
-
-      const confirmedEntries = mappedSaved.length > 0 ? mappedSaved : finalizedFoods;
-      setLogs((prev) => [...confirmedEntries, ...prev]);
-
-      confetti({
-        particleCount: 80,
-        spread: 60,
-        origin: { y: 0.85 },
-        colors: ['#ffffff', '#e4e4e7', '#a1a1aa', '#52525b']
-      });
 
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === activeReviewMessageId
             ? {
                 ...msg,
-                text: "Logged successfully! 🍳",
+                text: 'Logged successfully! 🍳',
                 pendingFoods: undefined,
-                parsedFoods: savedEntries
+                parsedFoods: savedEntries,
               }
             : msg
         )
       );
     } catch (err) {
-      console.warn('Failed to confirm and save to Supabase. Storing parsed entries offline...', err);
-
-      // Mark finalized foods as offline
-      const offlineEntries = finalizedFoods.map(item => ({
-        ...item,
-        isOffline: true
-      }));
-
-      // Add to logs state so user sees them immediately
-      setLogs((prev) => [...offlineEntries, ...prev]);
-
-      // Queue offline ADD action
-      try {
-        const tempId = generateTempId();
-        const existingActions: OfflineAction[] = JSON.parse(localStorage.getItem(`offline_pending_actions_${user.id}`) || '[]');
-        existingActions.push({
-          type: 'ADD',
-          tempId,
-          parsedEntries: offlineEntries,
-          timestamp: getCurrentIsoString()
-        });
-        localStorage.setItem(`offline_pending_actions_${user.id}`, JSON.stringify(existingActions));
-      } catch (storageErr) {
-        console.error('Failed to write offline action to localStorage:', storageErr);
-      }
-
-      // Show bot notification
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === activeReviewMessageId
-            ? {
-                ...msg,
-                text: "Saved offline. Will save to database when online. 🍳",
-                pendingFoods: undefined,
-                parsedFoods: []
-              }
-            : msg
-        )
-      );
+      // The only way a local write fails is a blocked or full store. Say so
+      // plainly and keep the review table open so nothing is lost.
+      console.error('Failed to save entries locally.', err);
+      const reason = err instanceof Error ? err.message : 'Your entries could not be saved.';
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: generateMessageId('bot-error'),
+          sender: 'bot',
+          text: reason,
+          timestamp: new Date(),
+        },
+      ]);
+      return;
     } finally {
-      setActiveReviewMessageId(null);
-      setActiveFoods([]);
       setIsBotTyping(false);
     }
+
+    setActiveReviewMessageId(null);
+    setActiveFoods([]);
   };
 
   const handleDiscard = () => {
@@ -828,9 +312,9 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
           msg.id === activeReviewMessageId
             ? {
                 ...msg,
-                text: "Discarded logging session. ❌",
+                text: 'Discarded logging session. ❌',
                 pendingFoods: undefined,
-                parsedFoods: []
+                parsedFoods: [],
               }
             : msg
         )
@@ -841,209 +325,60 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
   };
 
   const handleDeleteFoodEntry = async (id: string) => {
-    setLogs((prev) => prev.filter((item) => item.id !== id));
-
-    if (id.startsWith('temp-')) {
-      try {
-        const existingActions: OfflineAction[] = JSON.parse(localStorage.getItem(`offline_pending_actions_${user.id}`) || '[]');
-        const updatedActions = existingActions.filter((act: any) => act.tempId !== id);
-        localStorage.setItem(`offline_pending_actions_${user.id}`, JSON.stringify(updatedActions));
-      } catch (e) {
-        console.error('Failed to update offline actions queue', e);
-      }
-      return;
-    }
-
-    if (!navigator.onLine) {
-      try {
-        const existingActions: OfflineAction[] = JSON.parse(localStorage.getItem(`offline_pending_actions_${user.id}`) || '[]');
-        existingActions.push({
-          type: 'DELETE',
-          id,
-          timestamp: getCurrentIsoString()
-        });
-        localStorage.setItem(`offline_pending_actions_${user.id}`, JSON.stringify(existingActions));
-      } catch (e) {
-        console.error('Failed to queue offline delete', e);
-      }
-      return;
-    }
-
-    try {
-      const { error } = await supabase
-        .from('food_logs')
-        .delete()
-        .eq('id', id);
-      if (error) throw error;
-    } catch (error) {
-      console.warn('Delete request failed, queuing offline delete action...', error);
-      try {
-        const existingActions: OfflineAction[] = JSON.parse(localStorage.getItem(`offline_pending_actions_${user.id}`) || '[]');
-        existingActions.push({
-          type: 'DELETE',
-          id,
-          timestamp: getCurrentIsoString()
-        });
-        localStorage.setItem(`offline_pending_actions_${user.id}`, JSON.stringify(existingActions));
-      } catch (e) {
-        console.error('Failed to queue offline delete after failure', e);
-      }
-    }
+    deleteEntry(id);
   };
 
   const handleUpdateFoodEntry = async (updatedEntry: FoodEntry) => {
-    const id = updatedEntry.id;
-    
-    setLogs((prev) =>
-      prev.map((item) => (item.id === id ? updatedEntry : item))
-    );
-
-    if (id.startsWith('temp-')) {
-      try {
-        const existingActions: OfflineAction[] = JSON.parse(localStorage.getItem(`offline_pending_actions_${user.id}`) || '[]');
-        const updatedActions = existingActions.map((act: any) =>
-          act.tempId === id ? { ...act, text: updatedEntry.name } : act
-        );
-        localStorage.setItem(`offline_pending_actions_${user.id}`, JSON.stringify(updatedActions));
-      } catch (e) {
-        console.error('Failed to update pending actions queue', e);
-      }
-      return;
-    }
-
-    if (!navigator.onLine) {
-      setLogs((prev) =>
-        prev.map((item) =>
-          item.id === id ? { ...updatedEntry, isOfflineUpdated: true } : item
-        )
-      );
-
-      try {
-        const existingActions: OfflineAction[] = JSON.parse(localStorage.getItem(`offline_pending_actions_${user.id}`) || '[]');
-        const existingEditIdx = existingActions.findIndex((act: any) => act.type === 'EDIT' && act.id === id);
-        if (existingEditIdx !== -1) {
-          existingActions[existingEditIdx].entry = updatedEntry;
-        } else {
-          existingActions.push({
-            type: 'EDIT',
-            id,
-            entry: updatedEntry,
-            timestamp: getCurrentIsoString()
-          });
-        }
-        localStorage.setItem(`offline_pending_actions_${user.id}`, JSON.stringify(existingActions));
-      } catch (e) {
-        console.error('Failed to queue offline edit', e);
-      }
-      return;
-    }
-
-    try {
-      const { error } = await supabase
-        .from('food_logs')
-        .update({
-          name: updatedEntry.name,
-          quantity: updatedEntry.quantity,
-          unit: updatedEntry.unit,
-          calories: updatedEntry.calories,
-          protein: updatedEntry.protein,
-          carbs: updatedEntry.carbs,
-          fats: updatedEntry.fats,
-          sugar: updatedEntry.sugar || 0,
-          fiber: updatedEntry.fiber || 0
-        })
-        .eq('id', id);
-
-      if (error) throw error;
-    } catch (err) {
-      console.warn('Update failed, fallback to local offline edit...', err);
-      setLogs((prev) =>
-        prev.map((item) =>
-          item.id === id ? { ...updatedEntry, isOfflineUpdated: true } : item
-        )
-      );
-
-      try {
-        const existingActions: OfflineAction[] = JSON.parse(localStorage.getItem(`offline_pending_actions_${user.id}`) || '[]');
-        const existingEditIdx = existingActions.findIndex((act: any) => act.type === 'EDIT' && act.id === id);
-        if (existingEditIdx !== -1) {
-          existingActions[existingEditIdx].entry = updatedEntry;
-        } else {
-          existingActions.push({
-            type: 'EDIT',
-            id,
-            entry: updatedEntry,
-            timestamp: getCurrentIsoString()
-          });
-        }
-        localStorage.setItem(`offline_pending_actions_${user.id}`, JSON.stringify(existingActions));
-      } catch (e) {
-        console.error('Failed to queue offline edit after failure', e);
-      }
-    }
+    updateEntry(updatedEntry);
   };
 
-  const handleClearAll = async () => {
-    const confirmClear = window.confirm("Are you sure you want to clear all logged food items for today?");
-    if (!confirmClear) return;
+  /** Opens the confirmation. The clear itself happens in `performClearAll`. */
+  const handleClearAll = () => setConfirmClearOpen(true);
 
-    const todayStr = getTodayDate();
-    setLogs([]);
+  const performClearAll = () => {
+    setConfirmClearOpen(false);
+    clearDay();
 
-    if (isOnline) {
-      try {
-        const { error } = await supabase
-          .from('food_logs')
-          .delete()
-          .eq('date', todayStr);
-        
-        if (error) throw error;
-      } catch (err) {
-        console.error('Failed to clear daily entries:', err);
-      }
-    }
-    localStorage.setItem(`food_logs_local_${user.id}`, JSON.stringify([]));
-    
-    const resetMsg: Message = {
-      id: `bot-reset-${Date.now()}`,
-      sender: 'bot',
-      text: "I've reset your daily logs. Ready to record your next meal!",
-      timestamp: new Date(),
-    };
-    setMessages((prev) => [...prev, resetMsg]);
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `bot-reset-${Date.now()}`,
+        sender: 'bot',
+        text: "I've reset your daily logs. Ready to record your next meal!",
+        timestamp: new Date(),
+      },
+    ]);
   };
 
   return (
-    <div className="flex flex-col w-full overflow-hidden bg-black text-white" style={{ height: '100dvh' }}>
-      {/* Navbar */}
-      <Navbar
-        userEmail={user.email}
-        isOnline={isOnline}
-        onLogout={onLogout}
-        isDashboardOpenMobile={isDashboardOpenMobile}
-        setIsDashboardOpenMobile={setIsDashboardOpenMobile}
-        hasLogs={logs.length > 0}
-      />
+    <div className="flex flex-col w-full overflow-hidden" style={{ height: '100dvh' }}>
+      <Blobs />
+
+      <Navbar isOnline={isOnline} onOpenSettings={() => setSettingsOpen(true)} />
 
       <div className="flex-1 flex flex-row overflow-hidden relative min-h-0">
-        {/* Left Logger Column */}
-        <FoodLogger
-          messages={messages}
-          logs={logs}
-          activeReviewMessageId={activeReviewMessageId}
-          activeFoods={activeFoods}
-          setActiveFoods={setActiveFoods}
-          isBotTyping={isBotTyping}
-          onSendMessage={handleSendMessage}
-          onConfirmLog={handleConfirmLog}
-          onDiscard={handleDiscard}
-          messagesEndRef={messagesEndRef}
-        />
+        {/* Chat / Log screen — always visible on desktop; on mobile only when 'log' tab is active */}
+        <div className={`flex-1 min-w-0 min-h-0 flex-col ${mobileTab === 'log' ? 'flex' : 'hidden lg:flex'}`}>
+          <FoodLogger
+            messages={messages}
+            logs={logs}
+            activeReviewMessageId={activeReviewMessageId}
+            activeFoods={activeFoods}
+            setActiveFoods={setActiveFoods}
+            isBotTyping={isBotTyping}
+            onSendMessage={handleSendMessage}
+            onConfirmLog={handleConfirmLog}
+            onDiscard={handleDiscard}
+            messagesEndRef={messagesEndRef}
+          />
+        </div>
 
-        {/* Desktop Dashboard panel — fluid width, never overflows */}
+        {/* Progress screen — side panel on desktop; full-screen tab view on mobile.
+            One shared instance so data fetches are never duplicated. */}
         <div
-          className="hidden lg:flex h-full shrink-0 flex-col"
-          style={{ width: 'clamp(280px, 28vw, 360px)' }}
+          className={`h-full min-h-0 flex-col ${
+            mobileTab === 'progress' ? 'flex w-full' : 'hidden'
+          } lg:flex lg:w-[clamp(320px,30vw,420px)] lg:shrink-0`}
         >
           <NutritionDashboard
             key={todayDateStr}
@@ -1054,34 +389,86 @@ export default function Dashboard({ user, onLogout }: DashboardProps) {
             onClearAll={handleClearAll}
           />
         </div>
-
-        {/* Mobile Drawer Slide-over Panel */}
-        {isDashboardOpenMobile && (
-          <div className="lg:hidden fixed inset-0 z-50 flex justify-end">
-            {/* Backdrop */}
-            <div
-              onClick={() => setIsDashboardOpenMobile(false)}
-              className="absolute inset-0 bg-black/85 backdrop-blur-sm"
-            />
-
-            {/* Panel — capped at 85vw so it never fills entire narrow screen */}
-            <div
-              className="relative h-full bg-black border-l border-zinc-900 shadow-2xl flex flex-col drawer-enter overflow-hidden"
-              style={{ width: 'min(85vw, 360px)' }}
-            >
-              <NutritionDashboard
-                key={todayDateStr}
-                logs={logs}
-                dailyGoal={dailyGoal}
-                onDeleteFoodLog={handleDeleteFoodEntry}
-                onUpdateFoodLog={handleUpdateFoodEntry}
-                onClearAll={handleClearAll}
-                onCloseMobile={() => setIsDashboardOpenMobile(false)}
-              />
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* Mobile bottom tab bar — native-app navigation */}
+      <nav
+        className="lg:hidden glass border-t border-white/[0.06] shrink-0 z-30 flex items-stretch px-3"
+        style={{ height: 'var(--tabbar-h)', paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        {TABS.map((tab) => {
+          const isActive = mobileTab === tab.id;
+          const Icon = tab.icon;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setMobileTab(tab.id)}
+              className="flex-1 flex flex-col items-center justify-center gap-0.5 relative touch-manipulation"
+              aria-current={isActive ? 'page' : undefined}
+            >
+              <div className="relative px-5 py-1.5">
+                {/* Shared layout id makes the pill glide between tabs */}
+                {isActive && (
+                  <motion.div
+                    layoutId="tab-pill"
+                    className="absolute inset-0 rounded-full grad-accent shadow-glow"
+                    transition={spring}
+                  />
+                )}
+                <motion.div
+                  animate={{ scale: isActive ? 1.06 : 1 }}
+                  transition={spring}
+                  className={`relative ${isActive ? 'text-surface-base' : 'text-fg-dim'}`}
+                >
+                  <Icon className="w-5 h-5" />
+                  {tab.id === 'progress' && logs.length > 0 && !isActive && (
+                    <motion.span
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      className="absolute -top-0.5 -right-1 w-2 h-2 rounded-full bg-accent ring-2 ring-surface-base"
+                    />
+                  )}
+                </motion.div>
+              </div>
+              <span
+                className={`text-[10px] font-extrabold transition-colors ${
+                  isActive ? 'text-accent' : 'text-fg-dim'
+                }`}
+              >
+                {tab.label}
+              </span>
+            </button>
+          );
+        })}
+      </nav>
+
+      <AnimatePresence>
+        {settingsOpen && (
+          <Suspense key="settings" fallback={null}>
+            <SettingsSheet
+              open={settingsOpen}
+              onClose={() => setSettingsOpen(false)}
+              dailyGoal={dailyGoal}
+            />
+          </Suspense>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {confirmClearOpen && (
+          <ConfirmDialog
+            key="confirm-clear"
+            open={confirmClearOpen}
+            icon={<Trash2 className="w-7 h-7" />}
+            title="Clear today's log?"
+            message="This removes every food item logged today. Your history for other days stays exactly as it is."
+            confirmLabel="Clear it"
+            cancelLabel="Keep it"
+            onConfirm={performClearAll}
+            onCancel={() => setConfirmClearOpen(false)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

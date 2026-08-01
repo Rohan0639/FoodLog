@@ -1,7 +1,6 @@
 import { GeminiResponse } from '../../shared/types';
 import { parseFoodRules } from './parser';
 import { callGemini } from '../services/gemini';
-import { supabase } from '../services/supabaseClient';
 
 /**
  * Orchestrates food parsing logic.

@@ -1,86 +1,125 @@
 import React from 'react';
-import { Apple, MessageSquarePlus, Sparkles, Flame, Plus } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Sparkles, Lightbulb, ArrowRight } from 'lucide-react';
+import { cardIn, spring, stagger } from '../ui/motion';
 
 interface EmptyStateProps {
   onSelectSuggestion: (text: string) => void;
 }
 
 const SUGGESTIONS = [
-  { text: 'I ate 2 bananas and 3 eggs', category: 'Breakfast', icon: '🍳' },
-  { text: 'Logged a black coffee and chocolate chip cookie', category: 'Snack', icon: '🍪' },
-  { text: 'I had 150g chicken breast and sweet potato for lunch', category: 'Lunch', icon: '🥗' },
-  { text: '1 cup of blueberries and an avocado', category: 'Healthy Snack', icon: '🥑' },
+  { text: 'I ate 2 bananas and 3 eggs', category: 'Breakfast', icon: '🍳', tint: 'bg-white/10' },
+  { text: 'Logged a black coffee and chocolate chip cookie', category: 'Snack', icon: '🍪', tint: 'bg-white/10' },
+  { text: 'I had 150g chicken breast and sweet potato for lunch', category: 'Lunch', icon: '🥗', tint: 'bg-white/10' },
+  { text: '1 cup of blueberries and an avocado', category: 'Healthy snack', icon: '🥑', tint: 'bg-white/10' },
 ];
 
 export const EmptyState: React.FC<EmptyStateProps> = ({ onSelectSuggestion }) => {
   return (
-    <div className="flex flex-col items-center justify-center text-center h-full w-full mx-auto animate-slide-up" style={{ padding: 'clamp(16px, 4vw, 48px)', maxWidth: '480px' }}>
-      {/* Visual Icon */}
-      <div className="relative mb-5 sm:mb-6">
-        <div
-          className="rounded-2xl bg-zinc-900 flex items-center justify-center border border-zinc-800 text-white shadow-sm"
-          style={{ width: 'var(--avatar-md)', height: 'var(--avatar-md)', aspectRatio: '1' }}
+    <motion.div
+      variants={stagger(0.07, 0.05)}
+      initial="hidden"
+      animate="show"
+      className="flex flex-col items-center justify-center text-center h-full w-full mx-auto"
+      style={{ padding: 'clamp(16px, 4vw, 40px)', maxWidth: '520px' }}
+    >
+      {/* Mascot */}
+      <motion.div variants={cardIn} className="relative mb-5">
+        <motion.div
+          animate={{ y: [0, -9, 0] }}
+          transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}
+          className="rounded-4xl grad-accent flex items-center justify-center shadow-glow-lg text-4xl"
+          style={{ width: 'clamp(76px, 18vw, 96px)', height: 'clamp(76px, 18vw, 96px)' }}
         >
-          <Apple style={{ width: 'var(--icon-lg)', height: 'var(--icon-lg)' }} />
-        </div>
-        <div className="absolute -top-1 -right-1 bg-white rounded-full flex items-center justify-center animate-pulse border border-black shadow" style={{ width: 'var(--icon-sm)', height: 'var(--icon-sm)', aspectRatio: '1' }}>
-          <Sparkles style={{ width: 'var(--icon-xs)', height: 'var(--icon-xs)' }} className="text-black" />
-        </div>
-      </div>
+          <span role="img" aria-label="salad">🥗</span>
+        </motion.div>
 
-      {/* Hero Title */}
-      <h2 className="font-bold tracking-tight text-white mb-2 font-sans" style={{ fontSize: 'clamp(1.1rem, 4vw, 1.5rem)' }}>
-        FoodLog Assistant
-      </h2>
-      <p className="text-zinc-400 mb-6 sm:mb-8" style={{ fontSize: 'var(--fs-sm)', maxWidth: 'min(300px, 80vw)' }}>
-        Log your meals naturally. Type exactly what you ate, and let the assistant compute your macros.
-      </p>
+        <motion.div
+          animate={{ scale: [1, 1.18, 1], rotate: [0, 14, 0] }}
+          transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute -top-2 -right-2 bg-surface-card rounded-full flex items-center justify-center shadow-soft-md w-9 h-9"
+        >
+          <Sparkles className="w-4 h-4 text-accent fill-white/30" />
+        </motion.div>
+      </motion.div>
 
-      {/* Suggested prompts */}
-      <div className="w-full space-y-2">
+      <motion.h2
+        variants={cardIn}
+        className="font-extrabold text-fg-strong mb-2"
+        style={{ fontSize: 'var(--fs-xl)' }}
+      >
+        What did you eat <span className="text-grad-accent">today?</span>
+      </motion.h2>
+
+      <motion.p
+        variants={cardIn}
+        className="text-fg-muted font-semibold mb-7 leading-relaxed"
+        style={{ fontSize: 'var(--fs-sm)', maxWidth: 'min(340px, 84vw)' }}
+      >
+        Describe your meal in plain words — I'll work out the calories and macros for you.
+      </motion.p>
+
+      {/* Suggestions */}
+      <motion.div variants={cardIn} className="w-full space-y-2.5">
         <div
-          className="flex items-center gap-2 font-semibold text-zinc-400 uppercase tracking-wider mb-1 px-1 justify-start"
+          className="flex items-center gap-1.5 font-extrabold text-fg-dim mb-2 px-1"
           style={{ fontSize: 'var(--fs-xs)' }}
         >
-          <MessageSquarePlus style={{ width: 'var(--icon-xs)', height: 'var(--icon-xs)' }} className="text-zinc-400 shrink-0" />
-          <span>Quick Log Examples</span>
+          <Lightbulb className="w-3.5 h-3.5 text-accent shrink-0" />
+          <span>Tap one to try it</span>
         </div>
 
         {SUGGESTIONS.map((suggestion, index) => (
-          <button
+          <motion.button
             key={index}
+            variants={cardIn}
+            whileHover={{ scale: 1.02, y: -3 }}
+            whileTap={{ scale: 0.97 }}
+            transition={spring}
             onClick={() => onSelectSuggestion(suggestion.text)}
-            className="w-full text-left rounded-xl border border-zinc-800 bg-zinc-900/30 hover:bg-zinc-900 hover:border-zinc-700 transition-all duration-200 group flex items-start shadow-sm"
-            style={{ padding: 'clamp(8px, 2vw, 14px)', gap: 'clamp(8px, 2vw, 14px)' }}
+            className="w-full text-left rounded-3xl bg-surface-card border-2 border-white/[0.06]
+                       hover:border-white/25 shadow-soft hover:shadow-float
+                       transition-colors duration-200 group flex items-center gap-3 p-3 touch-manipulation"
           >
             <span
-              className="leading-none pt-0.5 shrink-0"
+              className={`${suggestion.tint} rounded-2xl flex items-center justify-center shrink-0 text-xl w-11 h-11`}
               role="img"
-              aria-label="emoji"
-              style={{ fontSize: 'clamp(1rem, 3.5vw, 1.25rem)' }}
+              aria-hidden
             >
               {suggestion.icon}
             </span>
+
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-zinc-500 mb-0.5" style={{ fontSize: 'var(--fs-xs)' }}>
+              <p className="font-extrabold text-fg-dim mb-0.5" style={{ fontSize: '11px' }}>
                 {suggestion.category}
               </p>
-              <p className="font-semibold text-zinc-200 group-hover:text-white transition-colors truncate" style={{ fontSize: 'var(--fs-sm)' }}>
-                "{suggestion.text}"
+              <p
+                className="font-bold text-fg-strong truncate"
+                style={{ fontSize: 'var(--fs-sm)' }}
+              >
+                {suggestion.text}
               </p>
             </div>
-            <span className="self-center text-zinc-500 group-hover:text-white transition-colors shrink-0">
-              <Plus style={{ width: 'var(--icon-sm)', height: 'var(--icon-sm)' }} />
-            </span>
-          </button>
-        ))}
-      </div>
 
-      {/* Tips footer */}
-      <div className="mt-5 flex items-center gap-2 text-zinc-400 bg-zinc-900/40 px-3 py-1.5 rounded-full border border-zinc-800" style={{ fontSize: 'var(--fs-xs)' }}>
-        <Flame style={{ width: 'var(--icon-xs)', height: 'var(--icon-xs)' }} className="text-white shrink-0" />
-        <span>Try mixing multiple foods with "and" or "+"</span>
-      </div>
-    </div>
+            <motion.span
+              className="shrink-0 w-7 h-7 rounded-full bg-surface-inset text-fg-dim
+                         group-hover:bg-accent group-hover:text-surface-base
+                         flex items-center justify-center transition-colors duration-200"
+            >
+              <ArrowRight className="w-3.5 h-3.5" />
+            </motion.span>
+          </motion.button>
+        ))}
+      </motion.div>
+
+      <motion.div
+        variants={cardIn}
+        className="mt-6 flex items-center gap-2 text-fg-muted bg-surface-card/70 px-4 py-2 rounded-full shadow-soft font-bold"
+        style={{ fontSize: 'var(--fs-xs)' }}
+      >
+        <span role="img" aria-hidden>💡</span>
+        <span>Combine foods with “and” or “+”</span>
+      </motion.div>
+    </motion.div>
   );
 };

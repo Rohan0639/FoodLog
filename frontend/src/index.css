@@ -11,42 +11,54 @@
 
 /* ─── Fluid Design Tokens ────────────────────────────────── */
 :root {
-  /* Font scale: min 12px → max 16px */
-  --fs-xs:   clamp(0.625rem, 1.8vw, 0.75rem);
-  --fs-sm:   clamp(0.75rem,  2vw,   0.875rem);
-  --fs-base: clamp(0.8125rem, 2.2vw, 0.9375rem);
-  --fs-md:   clamp(0.875rem, 2.4vw, 1rem);
+  color-scheme: dark;
+
+  /* Font scale */
+  --fs-xs:   clamp(0.6875rem, 1.9vw, 0.8125rem);
+  --fs-sm:   clamp(0.8125rem, 2.1vw, 0.9375rem);
+  --fs-base: clamp(0.875rem,  2.3vw, 1rem);
+  --fs-md:   clamp(0.9375rem, 2.5vw, 1.0625rem);
+  --fs-lg:   clamp(1.125rem,  3.4vw, 1.5rem);
+  --fs-xl:   clamp(1.5rem,    5vw,   2rem);
 
   /* Icon sizes */
-  --icon-xs:  clamp(12px, 3vw, 16px);
-  --icon-sm:  clamp(14px, 3.5vw, 18px);
-  --icon-md:  clamp(18px, 4.5vw, 24px);
-  --icon-lg:  clamp(22px, 5.5vw, 32px);
+  --icon-xs:  clamp(13px, 3vw, 16px);
+  --icon-sm:  clamp(15px, 3.6vw, 19px);
+  --icon-md:  clamp(19px, 4.6vw, 24px);
+  --icon-lg:  clamp(24px, 5.6vw, 34px);
 
-  /* Spacing tokens */
-  --sp-1: clamp(4px,  1vw, 6px);
-  --sp-2: clamp(6px,  1.5vw, 10px);
-  --sp-3: clamp(8px,  2vw, 14px);
-  --sp-4: clamp(12px, 3vw, 20px);
+  /* Spacing */
+  --sp-1: clamp(4px,  1vw,   6px);
+  --sp-2: clamp(8px,  1.8vw, 12px);
+  --sp-3: clamp(12px, 2.6vw, 18px);
+  --sp-4: clamp(16px, 3.4vw, 24px);
+  --sp-5: clamp(22px, 4.5vw, 32px);
 
-  /* Avatar/badge */
-  --avatar-sm: clamp(28px, 7vw, 36px);
-  --avatar-md: clamp(32px, 8vw, 40px);
+  /* Avatars */
+  --avatar-sm: clamp(32px, 8vw, 40px);
+  --avatar-md: clamp(38px, 9vw, 46px);
 
-  /* Navbar height */
-  --navbar-h: clamp(52px, 10vw, 64px);
+  /* Chrome */
+  --navbar-h: clamp(62px, 11vw, 74px);
+  --tabbar-h: clamp(62px, 13vw, 70px);
+
+  /* Motion — one easing vocabulary for the whole app */
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring:   cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 @layer base {
   html {
     overflow-x: hidden;
+    -webkit-tap-highlight-color: transparent;
   }
 
   body {
-    @apply bg-black text-white antialiased font-sans m-0 p-0;
+    @apply text-fg-base antialiased font-sans m-0 p-0;
+    background: #0A0A0C;
     overflow-x: hidden;
     overflow-y: hidden;
-    height: 100dvh; /* use dvh so mobile chrome bottom bar is accounted for */
+    height: 100dvh;
   }
 
   #root {
@@ -55,47 +67,159 @@
     width: 100%;
     overflow-x: hidden;
   }
+
+  /* Headings lean on the rounder display face */
+  h1, h2, h3, h4 {
+    @apply font-display tracking-tight text-fg-strong;
+  }
+
+  /* Remove the number-input spinners — quantities use their own steppers */
+  input[type='number']::-webkit-outer-spin-button,
+  input[type='number']::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type='number'] {
+    -moz-appearance: textfield;
+  }
+
+  /* Native dropdown lists render in the OS palette; keep them dark too */
+  option,
+  optgroup {
+    background-color: #131316;
+    color: #FAFAFA;
+  }
 }
 
-/* ─── Custom Scrollbar ──────────────────────────────────── */
+/* ─── Scrollbar ─────────────────────────────────────────── */
 ::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
+  width: 6px;
+  height: 6px;
 }
-
 ::-webkit-scrollbar-track {
   background: transparent;
 }
-
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.14);
   border-radius: 9999px;
 }
-
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.28);
 }
 
-/* ─── Glassmorphism ─────────────────────────────────────── */
+@layer components {
+  /* Floating card — the app's primary surface */
+  .card {
+    @apply bg-surface-card rounded-3xl shadow-soft;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  /* Recessed panel inside a card */
+  .card-inset {
+    @apply bg-surface-inset rounded-2xl;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full font-bold;
+  }
+
+  .num {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  /* Form controls — shared so every input in the app matches */
+  .field {
+    @apply w-full bg-surface-inset border-2 border-surface-line rounded-2xl
+           text-fg-strong placeholder-fg-dim font-semibold
+           focus:outline-none focus:border-white/30 focus:bg-surface-raised
+           transition-all duration-200;
+    padding: 0.7rem 1rem;
+  }
+
+  .field-sm {
+    @apply bg-surface-inset border-2 border-surface-line rounded-xl text-fg-strong
+           font-bold focus:outline-none focus:border-white/30 focus:bg-surface-raised
+           transition-all duration-200;
+    padding: 0.35rem 0.55rem;
+  }
+
+  /* Native select needs its own arrow once appearance is stripped */
+  .select-arrow {
+    -webkit-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23A1A1AA' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.5rem center;
+    padding-right: 1.6rem;
+  }
+}
+
+/* ─── Frosted glass ─────────────────────────────────────── */
 .glass {
-  background: rgba(10, 10, 10, 0.8);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(10, 10, 12, 0.72);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
 }
 
-.glass-monochrome {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+.glass-strong {
+  background: rgba(19, 19, 22, 0.88);
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
 }
 
-/* ─── Mobile Drawer Slide Transition ───────────────────── */
-@keyframes slideInRight {
-  from { transform: translateX(100%); opacity: 0; }
-  to   { transform: translateX(0);   opacity: 1; }
+/* ─── Gradients ─────────────────────────────────────────────
+   Each carries its own foreground colour, so callers never have to
+   remember whether a surface needs light or dark text on it.        */
+
+/* Primary / active: a white surface with dark type. */
+.grad-accent {
+  background-image: linear-gradient(135deg, #FFFFFF 0%, #EDEDEF 55%, #D4D4D8 100%);
+  color: #0A0A0C;
 }
-.drawer-enter {
-  animation: slideInRight 0.22s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+
+/* Secondary: a raised dark tile with light type — icon chips, avatars. */
+.grad-tile {
+  background-image: linear-gradient(135deg, #2C2C33 0%, #1C1C21 100%);
+  color: #FAFAFA;
+}
+
+/* Ambient panel wash */
+.grad-panel {
+  background-image: linear-gradient(180deg, #1A1A1E 0%, #131316 100%);
+}
+
+.text-grad-accent {
+  background-image: linear-gradient(120deg, #FFFFFF, #8E8E97);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ─── Loading shimmer ───────────────────────────────────── */
+.skeleton {
+  @apply relative overflow-hidden bg-surface-raised rounded-2xl;
+}
+.skeleton::after {
+  content: '';
+  @apply absolute inset-0 -translate-x-full;
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: shimmer 1.6s infinite;
+}
+
+/* ─── Accessibility: honour reduced-motion ──────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }

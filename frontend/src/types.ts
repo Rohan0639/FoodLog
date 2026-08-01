@@ -27,8 +27,6 @@ export interface FoodEntry {
   sugar: number;
   fiber: number;
   createdAt: string;
-  isOffline?: boolean;
-  isOfflineUpdated?: boolean;
   baseQuantity?: number;
   baseUnit?: string;
   baseFoodName?: string;
@@ -74,39 +72,12 @@ export interface ParsedTotals {
   fiber: number;
 }
 
-export interface ParsedData {
-  reply: string;
-  items: ParsedItem[];
-  totals: ParsedTotals;
-}
-
 export interface GeminiResponse {
   status: 'valid' | 'invalid';
   reason?: string;
   reply?: string;
   items?: ParsedItem[];
   totals?: ParsedTotals;
-}
-
-export interface FoodLog {
-  _id: string;
-  userId: string;
-  foodText: string;
-  parsedData: ParsedData;
-  createdAt: string;
-  updatedAt: string;
-  isOffline?: boolean;
-  isOfflineUpdated?: boolean;
-}
-
-export interface OfflineAction {
-  type: 'ADD' | 'EDIT' | 'DELETE';
-  id?: string;
-  tempId?: string;
-  text?: string;
-  entry?: FoodEntry;
-  parsedEntries?: FoodEntry[];
-  timestamp: string;
 }
 
 export interface Message {

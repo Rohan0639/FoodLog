@@ -1,34 +1,32 @@
-import { Apple, LogOut, BarChart2 } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Apple, Settings, Wifi, WifiOff } from 'lucide-react';
+import { IconButton } from '../ui/primitives';
+import { spring } from '../ui/motion';
 
 interface NavbarProps {
-  userEmail?: string;
-  isOnline: boolean | null;
-  onLogout: () => void;
-  isDashboardOpenMobile: boolean;
-  setIsDashboardOpenMobile: (open: boolean) => void;
-  hasLogs: boolean;
+  /** Network reachability — the AI parser needs it. Logging never does. */
+  isOnline: boolean;
+  onOpenSettings?: () => void;
 }
 
-export default function Navbar({
-  userEmail,
-  isOnline,
-  onLogout,
-  isDashboardOpenMobile,
-  setIsDashboardOpenMobile,
-  hasLogs,
-}: NavbarProps) {
+export default function Navbar({ isOnline, onOpenSettings }: NavbarProps) {
   return (
-    <header
-      className="border-b border-zinc-900 bg-black/90 backdrop-blur-md shrink-0 z-20 flex items-center justify-between"
+    <motion.header
+      initial={{ y: -24, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ ...spring, delay: 0.05 }}
+      className="glass shrink-0 z-30 flex items-center justify-between border-b border-white/[0.06]"
       style={{
         height: 'var(--navbar-h)',
-        paddingInline: 'clamp(10px, 3vw, 24px)',
+        paddingInline: 'clamp(14px, 4vw, 28px)',
       }}
     >
       {/* ── Brand ── */}
-      <div className="flex items-center gap-2 min-w-0">
-        <div
-          className="rounded-lg bg-white flex items-center justify-center text-black shadow shrink-0"
+      <div className="flex items-center gap-2.5 min-w-0">
+        <motion.div
+          whileHover={{ rotate: [0, -10, 8, 0], scale: 1.06 }}
+          transition={{ duration: 0.5 }}
+          className="rounded-2xl grad-accent flex items-center justify-center shadow-glow shrink-0"
           style={{
             width: 'var(--avatar-sm)',
             height: 'var(--avatar-sm)',
@@ -36,84 +34,48 @@ export default function Navbar({
           }}
         >
           <Apple style={{ width: 'var(--icon-sm)', height: 'var(--icon-sm)' }} className="fill-black/10" />
-        </div>
+        </motion.div>
 
         <div className="min-w-0">
           <h1
-            className="font-bold text-white leading-none truncate"
-            style={{ fontSize: 'var(--fs-sm)' }}
+            className="font-extrabold text-fg-strong leading-none truncate"
+            style={{ fontSize: 'var(--fs-md)' }}
           >
-            FoodLog Assistant
+            FoodLog
           </h1>
-          <div className="flex items-center gap-1.5 mt-1">
-            {isOnline === null ? (
+          <motion.div
+            key={String(isOnline)}
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex items-center gap-1 mt-0.5"
+          >
+            {isOnline ? (
               <>
-                <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse shrink-0" />
-                <span className="font-bold uppercase tracking-wider text-yellow-400 truncate" style={{ fontSize: 'var(--fs-xs)' }}>
-                  Connecting...
-                </span>
-              </>
-            ) : isOnline ? (
-              <>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-                <span className="font-bold uppercase tracking-wider text-emerald-400 truncate" style={{ fontSize: 'var(--fs-xs)' }}>
-                  Online
+                <Wifi className="w-3 h-3 text-accent shrink-0" />
+                <span className="font-bold text-accent truncate" style={{ fontSize: 'var(--fs-xs)' }}>
+                  Ready
                 </span>
               </>
             ) : (
               <>
-                <span className="w-1.5 h-1.5 rounded-full bg-red-400 shrink-0" />
-                <span className="font-bold uppercase tracking-wider text-red-400 truncate" style={{ fontSize: 'var(--fs-xs)' }}>
+                <WifiOff className="w-3 h-3 text-fg-dim shrink-0" />
+                <span className="font-bold text-fg-dim truncate" style={{ fontSize: 'var(--fs-xs)' }}>
                   Offline
                 </span>
               </>
             )}
-          </div>
+          </motion.div>
         </div>
       </div>
 
       {/* ── Actions ── */}
-      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-        {userEmail && (
-          <span
-            className="hidden sm:inline-block text-zinc-400 font-medium truncate max-w-[140px]"
-            style={{ fontSize: 'var(--fs-xs)' }}
-          >
-            {userEmail}
-          </span>
+      <div className="flex items-center gap-2 shrink-0">
+        {onOpenSettings && (
+          <IconButton label="Settings" onClick={onOpenSettings}>
+            <Settings style={{ width: 'var(--icon-sm)', height: 'var(--icon-sm)' }} />
+          </IconButton>
         )}
-
-        <button
-          onClick={onLogout}
-          className="rounded-xl border border-zinc-800 bg-zinc-900/80 text-zinc-400 hover:text-white hover:border-zinc-700 flex items-center gap-1.5 shadow-sm active:scale-95 transition-all duration-150 font-semibold"
-          style={{ padding: 'clamp(6px,1.5vw,8px) clamp(8px,2vw,12px)', fontSize: 'var(--fs-xs)' }}
-          title="Sign Out"
-        >
-          <LogOut style={{ width: 'var(--icon-xs)', height: 'var(--icon-xs)' }} />
-          <span className="hidden md:inline">Sign Out</span>
-        </button>
-
-        {/* Mobile Stats Toggle */}
-        <button
-          onClick={() => setIsDashboardOpenMobile(!isDashboardOpenMobile)}
-          className="lg:hidden rounded-xl border border-zinc-800 bg-zinc-900/80 text-zinc-400 hover:text-white flex items-center gap-1.5 shadow-sm active:scale-95 transition-all duration-150"
-          style={{ padding: 'clamp(6px,1.5vw,8px) clamp(8px,2vw,12px)' }}
-        >
-          <BarChart2
-            style={{ width: 'var(--icon-sm)', height: 'var(--icon-sm)' }}
-            className="text-white"
-          />
-          <span
-            className="font-bold hidden min-[370px]:inline"
-            style={{ fontSize: 'var(--fs-xs)' }}
-          >
-            Stats
-          </span>
-          {hasLogs && (
-            <span className="w-2 h-2 rounded-full bg-white shrink-0" />
-          )}
-        </button>
       </div>
-    </header>
+    </motion.header>
   );
 }
