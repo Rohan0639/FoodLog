@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getCache, setCache } from '../backend/services/cache';
 import { parseFoodOrchestrator } from '../backend/parsers';
 import { normalizeFoodInput } from '../shared/normalize';
+import { check as checkRateLimit, clientKey } from '../backend/utils/rateLimit';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Set CORS headers
@@ -17,6 +18,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed. Only POST is supported.' });
+  }
+
+  // This endpoint spends money on every miss and has no authentication, so a
+  // discovered URL must not be able to drain the quota unattended.
+  const limit = checkRateLimit(clientKey(req.headers));
+  res.setHeader('X-RateLimit-Limit', String(limit.limit));
+  res.setHeader('X-RateLimit-Remaining', String(limit.remaining));
+
+  if (!limit.allowed) {
+    res.setHeader('Retry-After', String(limit.retryAfter));
+    return res.status(429).json({
+      error: 'Too Many Requests',
+      message: `Rate limit reached. Try again in ${limit.retryAfter}s.`,
+    });
   }
 
   try {

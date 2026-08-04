@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import type { FoodEntry } from '../types';
 import { UNIT_CATEGORIES, scaleMacrosByQuantity } from '../utils/unitConverter';
@@ -32,43 +32,55 @@ export const EditFoodModal: React.FC<EditFoodModalProps> = ({
   const [quantity, setQuantity] = useState<number>(entry.quantity);
   const [unit, setUnit] = useState(entry.unit || 'g');
 
-  const [calories, setCalories] = useState(entry.calories);
-  const [protein, setProtein] = useState(entry.protein);
-  const [carbs, setCarbs] = useState(entry.carbs);
-  const [fats, setFats] = useState(entry.fats);
-  const [sugar, setSugar] = useState(entry.sugar || 0);
-  const [fiber, setFiber] = useState(entry.fiber || 0);
-
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Recalculate macros dynamically when quantity or unit changes
-  useEffect(() => {
+  /**
+   * Macros are DERIVED from the quantity and unit, not stored alongside them.
+   *
+   * They were previously six pieces of state written by an effect, which meant
+   * every keystroke rendered twice and the displayed numbers lagged the input
+   * by a frame. Computing them during render removes both problems and makes
+   * an inconsistent state unrepresentable.
+   */
+  const { macros, conversionError } = useMemo(() => {
     if (quantity <= 0 || isNaN(quantity)) {
-      return;
+      // Keep the last valid figures on screen while the field is empty or
+      // mid-edit, rather than flashing zeros.
+      return {
+        macros: {
+          calories: entry.calories, protein: entry.protein, carbs: entry.carbs,
+          fats: entry.fats, sugar: entry.sugar || 0, fiber: entry.fiber || 0,
+        },
+        conversionError: null as string | null,
+      };
     }
 
     try {
-      const scaled = scaleMacrosByQuantity(
-        entry,
-        quantity,
-        unit || 'g',
-        entry.quantity,
-        entry.unit || 'g',
-        entry.name,
-      );
-      setCalories(scaled.calories);
-      setProtein(scaled.protein);
-      setCarbs(scaled.carbs);
-      setFats(scaled.fats);
-      setSugar(scaled.sugar);
-      setFiber(scaled.fiber);
-      setError(null);
+      return {
+        macros: scaleMacrosByQuantity(
+          entry,
+          quantity,
+          unit || 'g',
+          entry.quantity,
+          entry.unit || 'g',
+          entry.name,
+        ),
+        conversionError: null as string | null,
+      };
     } catch (err) {
       console.error('Recalculation error:', err);
-      setError('Invalid unit conversion.');
+      return {
+        macros: {
+          calories: entry.calories, protein: entry.protein, carbs: entry.carbs,
+          fats: entry.fats, sugar: entry.sugar || 0, fiber: entry.fiber || 0,
+        },
+        conversionError: 'Invalid unit conversion.',
+      };
     }
-  }, [quantity, unit, entry]);
+  }, [entry, quantity, unit]);
+
+  const { calories, protein, carbs, fats, sugar, fiber } = macros;
 
   if (!isOpen) return null;
 
@@ -108,6 +120,8 @@ export const EditFoodModal: React.FC<EditFoodModalProps> = ({
   };
 
   const values: Record<string, number> = { calories, protein, carbs, fats, sugar, fiber };
+  // A save failure takes precedence over a live conversion warning.
+  const visibleError = error ?? conversionError;
 
   return (
     <Modal open={isOpen} onClose={onClose} labelledBy="edit-food-title">
@@ -130,7 +144,7 @@ export const EditFoodModal: React.FC<EditFoodModalProps> = ({
       </div>
 
       <form onSubmit={handleSave} className="px-5 pb-5 space-y-3.5 overflow-y-auto">
-        {error && (
+        {visibleError && (
           <motion.div
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -138,7 +152,7 @@ export const EditFoodModal: React.FC<EditFoodModalProps> = ({
                        text-accent p-3 rounded-2xl font-bold"
           >
             <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{error}</span>
+            <span>{visibleError}</span>
           </motion.div>
         )}
 

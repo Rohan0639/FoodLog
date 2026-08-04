@@ -4,7 +4,11 @@ import type { FoodEntry, GeminiResponse, Message, ParsedItem } from '../types';
 import { scaleMacrosByQuantity } from '../utils/unitConverter';
 import confetti from 'canvas-confetti';
 import { analyzeFoodServer } from '../utils/serverParser';
-import { chatService, goalService, parseCacheService, settingsService } from '../lib/services';
+import {
+  chatService, dictionaryService, goalService, parseCacheService, settingsService,
+} from '../lib/services';
+import * as localParser from '../lib/parsing/localParser';
+import { splitParts } from '../lib/nlp/normalizeText';
 import { newId } from '../lib/storage/schema';
 import { getCurrentIsoString, getTodayDate, msUntilMidnight } from '../utils/date';
 import { useChatMessages } from '../hooks/useChatMessages';
@@ -26,18 +30,70 @@ const SettingsSheet = lazy(() =>
 const generateMessageId = (sender: string): string => `${sender}-${newId()}`;
 
 /**
- * Parses a phrase into food items.
+ * Parses a phrase into food items, spending a network call only when it must.
  *
- * Checks the local cache first, so a phrase logged before resolves instantly
- * and works with no connection. Only successful parses are cached.
+ *   1. whole-phrase cache — this exact sentence has been parsed before
+ *   2. personal dictionary — per fragment, so partial hits still pay off
+ *   3. the AI, asked only about the fragments nothing local could answer
+ *
+ * Foods the user eats regularly stop costing anything at all, and keep working
+ * with no connection.
  */
 async function analyzeFood(text: string): Promise<GeminiResponse> {
   const cached = parseCacheService.getCachedParse(text);
   if (cached) return cached;
 
-  const result = await analyzeFoodServer(text);
-  parseCacheService.setCachedParse(text, result);
-  return result;
+  const local = localParser.matchPhrase(text);
+  const localItems = local.matched.map(localParser.toParsedItem);
+  const anyGuessed = local.matched.some((match) => match.stage === 'fuzzy');
+
+  // Everything came from foods this device already knows.
+  if (localItems.length > 0 && local.unmatched.length === 0) {
+    return localParser.buildResponse(localItems, anyGuessed);
+  }
+
+  // Ask only about what is genuinely new. Fragments are independent foods, so
+  // sending a subset cannot change how the rest are interpreted.
+  const query = localItems.length > 0 ? local.unmatched.join(' and ') : text;
+  const remote = await analyzeFoodServer(query);
+
+  if (remote.status === 'invalid') {
+    // Some fragments were real foods even if the remainder was not — keep them
+    // rather than rejecting the whole message.
+    if (localItems.length > 0) return localParser.buildResponse(localItems, anyGuessed);
+    return remote;
+  }
+
+  // Tag AI items with the text that produced them, so confirming teaches the
+  // dictionary this phrasing.
+  //
+  // Only safe when the AI returned exactly one item per fragment we sent. It
+  // may legitimately merge or split them ("burger with cheese" is one dish),
+  // and a misaligned pairing would teach the wrong spelling to the wrong food.
+  const sent = localItems.length > 0 ? local.unmatched : splitParts(text);
+  const alignable = (remote.items ?? []).length === sent.length;
+
+  const remoteItems = (remote.items ?? []).map((item, index) => ({
+    ...item,
+    source: 'ai' as const,
+    sourceText: alignable ? sent[index] : undefined,
+  }));
+
+  if (localItems.length === 0) {
+    const whole = { ...remote, items: remoteItems };
+    parseCacheService.setCachedParse(text, whole);
+    return whole;
+  }
+
+  // Mixed result: don't cache under the full phrase, since only part of it was
+  // answered remotely and the local half may change as the dictionary grows.
+  const items = [...localItems, ...remoteItems];
+  return {
+    status: 'valid',
+    reply: remote.reply || 'Please review the parsed food items:',
+    items,
+    totals: localParser.totalsFor(items),
+  };
 }
 
 const TABS = [
@@ -179,6 +235,10 @@ export default function Dashboard() {
           sugarPerUnit: item.sugarPerUnit,
           fiberPerUnit: item.fiberPerUnit,
           aliases: item.aliases,
+          source: item.source,
+          matchConfidence: item.matchConfidence,
+          matchStage: item.matchStage,
+          sourceText: item.sourceText,
         };
       });
 
@@ -260,6 +320,19 @@ export default function Dashboard() {
 
       const savedEntries = addEntries(finalizedFoods);
 
+      // Teach the local dictionary what was just confirmed.
+      //
+      // Learns from `activeFoods`, not `finalizedFoods`: the former still
+      // carries the per-unit figures the parser returned (`caloriesPerUnit`,
+      // `baseUnit`, `aliases`), which the finalized records drop. Confirm time
+      // is the right moment — the user has reviewed these numbers and accepted
+      // them. Never allowed to block or fail the log itself.
+      try {
+        dictionaryService.learnMany(activeFoods, 'gemini');
+      } catch (err) {
+        console.warn('[dictionary] Could not learn from this log.', err);
+      }
+
       if (settingsService.getSettings().confettiEnabled) {
         confetti({
           particleCount: 110,
@@ -330,6 +403,14 @@ export default function Dashboard() {
 
   const handleUpdateFoodEntry = async (updatedEntry: FoodEntry) => {
     updateEntry(updatedEntry);
+
+    // A hand-edited entry is the user's own correction, so it is learned with
+    // 'user' precedence — a later parse of the same food will not overwrite it.
+    try {
+      dictionaryService.learn(updatedEntry, 'user');
+    } catch (err) {
+      console.warn('[dictionary] Could not learn from this edit.', err);
+    }
   };
 
   /** Opens the confirmation. The clear itself happens in `performClearAll`. */

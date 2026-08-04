@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { fromIsoDate, monthTransition } from '../utils/date';
 import {IconButton} from '../ui/primitives';
 import { cx } from '../ui/cx';
 import { monthSlide, spring } from '../ui/motion';
@@ -19,43 +20,37 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   onMonthChange,
 }) => {
   const today = new Date();
-  const [currentDate, setCurrentDate] = useState<Date>(new Date(selectedDate));
-  // Which way the month grid should slide.
-  const [direction, setDirection] = useState(0);
-  const monthRef = useRef<HTMLDivElement>(null);
+  const [view, setView] = useState<{ date: Date; direction: number }>(() => ({
+    date: fromIsoDate(selectedDate),
+    direction: 0,
+  }));
 
-  // Sync displayed month when selectedDate moves to a different month (e.g. via day arrows)
-  useEffect(() => {
-    const selected = new Date(selectedDate + 'T00:00:00');
-    if (
-      selected.getFullYear() !== currentDate.getFullYear() ||
-      selected.getMonth() !== currentDate.getMonth()
-    ) {
-      setDirection(
-        selected.getFullYear() * 12 + selected.getMonth() >
-          currentDate.getFullYear() * 12 + currentDate.getMonth()
-          ? 1
-          : -1
-      );
-      setCurrentDate(new Date(selected.getFullYear(), selected.getMonth(), 1));
-    }
-  }, [selectedDate]);
+  /**
+   * Following the selected date into another month is derived during render,
+   * not done in an effect. Setting state from an effect made every date change
+   * render twice and paint the old month for a frame.
+   */
+  const jump = monthTransition(selectedDate, view.date.getFullYear(), view.date.getMonth());
+  if (jump) {
+    setView({ date: new Date(jump.year, jump.month, 1), direction: jump.direction });
+  }
 
+  const currentDate = jump ? new Date(jump.year, jump.month, 1) : view.date;
+  const direction = jump ? jump.direction : view.direction;
+
+  // Tell the parent which month to load. This is a genuine side effect — it
+  // reaches outside React — so it belongs in an effect.
+  const visibleMonth = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
   useEffect(() => {
-    // Notify parent of initial month
-    const year = currentDate.getFullYear();
-    const month = String(currentDate.getMonth() + 1).padStart(2, '0');
-    onMonthChange(`${year}-${month}`);
-  }, [currentDate]);
+    onMonthChange(visibleMonth);
+  }, [visibleMonth, onMonthChange]);
 
   const handlePrevMonth = () => {
-    setDirection(-1);
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+    setView({ date: new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1), direction: -1 });
   };
 
   const handleNextMonth = () => {
-    setDirection(1);
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+    setView({ date: new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1), direction: 1 });
   };
 
   const getDaysInMonth = (date: Date) => {
@@ -149,7 +144,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       </div>
 
       {/* Month grid */}
-      <div className="overflow-hidden" ref={monthRef}>
+      <div className="overflow-hidden">
         <AnimatePresence mode="wait" custom={direction} initial={false}>
           <motion.div
             key={monthKey}

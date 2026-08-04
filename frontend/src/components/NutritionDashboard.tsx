@@ -7,6 +7,7 @@ import {
 import { getLocalIsoDate } from '../utils/date';
 import { logService } from '../lib/services';
 import { useHistoryData } from '../hooks/useHistoryData';
+import { BackupReminder } from './BackupReminder';
 import {Card, CountUp, ProgressBar, ProgressRing, SectionTitle, Skeleton} from '../ui/primitives';
 import { cx } from '../ui/cx';
 import { cardIn, listItem, spring, stagger } from '../ui/motion';
@@ -66,6 +67,8 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
   onCloseMobile,
 }) => {
   const [activeTab, setActiveTab] = useState<'today' | 'history'>('today');
+  /** Bumped on dismissal so the reminder re-evaluates instead of lingering. */
+  const [backupNudge, setBackupNudge] = useState(0);
   const [activeEditEntry, setActiveEditEntry] = useState<FoodEntry | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
@@ -166,6 +169,11 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
               exit={{ opacity: 0, y: -10, transition: { duration: 0.15 } }}
               className="space-y-4"
             >
+              {/* Only appears once there is a meaningful amount to lose. */}
+              <motion.div variants={cardIn}>
+                <BackupReminder key={backupNudge} onDismissed={() => setBackupNudge((n) => n + 1)} />
+              </motion.div>
+
               {/* ── Hero: greeting + calorie ring ── */}
               <Card variants={cardIn} className="overflow-hidden relative">
                 <div className="flex items-center gap-2 mb-1">

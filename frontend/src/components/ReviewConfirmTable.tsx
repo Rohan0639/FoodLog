@@ -2,7 +2,7 @@ import React from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { FoodEntry } from '../types';
 import { scaleMacrosByQuantity } from '../utils/unitConverter';
-import { Check, X, Minus, Plus, ClipboardList } from 'lucide-react';
+import { Check, X, Minus, Plus, ClipboardList, BookMarked } from 'lucide-react';
 import {Button, CountUp} from '../ui/primitives';
 import { cx } from '../ui/cx';
 import { listItem, spring, stagger } from '../ui/motion';
@@ -145,11 +145,33 @@ export const ReviewConfirmTable: React.FC<ReviewConfirmTableProps> = ({
                 >
                   {/* Name + remove */}
                   <div className="flex justify-between items-start gap-2">
-                    <span
-                      className="font-extrabold text-fg-strong capitalize text-sm leading-snug pr-1 break-words"
-                      title={food.name}
-                    >
-                      {food.name}
+                    <span className="min-w-0 pr-1">
+                      <span
+                        className="font-extrabold text-fg-strong capitalize text-sm leading-snug break-words"
+                        title={food.name}
+                      >
+                        {food.name}
+                      </span>
+                      {/* Where this row came from. A guess is labelled as one so
+                          the user knows which rows deserve a second look. */}
+                      {food.source === 'dictionary' && (
+                        <span
+                          className={cx(
+                            'chip ml-1.5 px-1.5 py-0.5 text-[9px] align-middle',
+                            food.matchStage === 'fuzzy'
+                              ? 'bg-white/10 text-fg-muted'
+                              : 'bg-white/[0.07] text-fg-dim'
+                          )}
+                          title={
+                            food.matchStage === 'fuzzy'
+                              ? `Best guess from your foods (${Math.round((food.matchConfidence ?? 0) * 100)}% match) — check this one`
+                              : 'Matched a food you have logged before'
+                          }
+                        >
+                          <BookMarked className="w-2.5 h-2.5" />
+                          {food.matchStage === 'fuzzy' ? 'guess' : 'your foods'}
+                        </span>
+                      )}
                     </span>
                     <motion.button
                       type="button"

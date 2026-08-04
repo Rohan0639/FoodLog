@@ -5,7 +5,9 @@
  * this layer knows that the store happens to be localStorage.
  */
 
+export * as backupService from './backupService';
 export * as chatService from './chatService';
+export * as dictionaryService from './dictionaryService';
 export * as favoritesService from './favoritesService';
 export * as goalService from './goalService';
 export * as logService from './logService';
