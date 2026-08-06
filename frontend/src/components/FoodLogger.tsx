@@ -1,6 +1,7 @@
 import React from 'react';
 import { AnimatePresence } from 'framer-motion';
 import type { Message, FoodEntry } from '../types';
+import type { PreparedImage } from '../utils/imageScan';
 import { EmptyState } from './EmptyState';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
@@ -12,10 +13,12 @@ interface FoodLoggerProps {
   activeFoods: FoodEntry[];
   setActiveFoods: React.Dispatch<React.SetStateAction<FoodEntry[]>>;
   isBotTyping: boolean;
-  onSendMessage: (text: string) => void;
+  onSendMessage: (text: string, image?: PreparedImage) => void;
   onConfirmLog: () => void;
   onDiscard: () => void;
   messagesEndRef: React.RefObject<HTMLDivElement | null>;
+  /** Enables attaching a nutrition label to a message. */
+  allowAttachments?: boolean;
 }
 
 export default function FoodLogger({
@@ -29,6 +32,7 @@ export default function FoodLogger({
   onConfirmLog,
   onDiscard,
   messagesEndRef,
+  allowAttachments,
 }: FoodLoggerProps) {
   const handleSelectSuggestion = (text: string) => {
     onSendMessage(text);
@@ -78,7 +82,11 @@ export default function FoodLogger({
       </div>
 
       {/* Floating input */}
-      <ChatInput onSendMessage={onSendMessage} disabled={isBotTyping || !!activeReviewMessageId} />
+      <ChatInput
+        onSendMessage={onSendMessage}
+        disabled={isBotTyping || !!activeReviewMessageId}
+        allowAttachments={allowAttachments}
+      />
     </div>
   );
 }

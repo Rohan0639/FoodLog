@@ -5,6 +5,41 @@ import { GEMINI_CONFIG } from '../../config';
 
 const GEMINI_API_URL = GEMINI_CONFIG.API_URL;
 
+/** Upstream is given this long before we give up on a single attempt. */
+const REQUEST_TIMEOUT_MS = 20000;
+/** One retry only — a second failure means the problem is not transient. */
+const MAX_ATTEMPTS = 2;
+const RETRY_BACKOFF_MS = 600;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * A single attempt, bounded by a timeout.
+ *
+ * Without this a hung upstream leaves the caller waiting until the platform
+ * kills the function, which the user experiences as a typing indicator that
+ * never stops.
+ */
+async function attemptFetch(url: string, body: string): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Transient conditions worth one more try. A 4xx is our fault and is not. */
+function isRetryable(status: number): boolean {
+  return status === 429 || status >= 500;
+}
+
 export async function callGemini(foodText: string): Promise<GeminiResponse> {
   const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
   if (!GEMINI_API_KEY) {
@@ -105,30 +140,45 @@ No explanation. Only JSON.
 
 Sentence to analyze: "${normalizedInput.replace(/"/g, '\"')}"`;
 
-  const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      contents: [
-        {
-          parts: [
-            {
-              text: prompt
-            }
-          ]
-        }
-      ],
-      generationConfig: {
-        responseMimeType: 'application/json'
-      }
-    })
+  const url = `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`;
+  const body = JSON.stringify({
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: { responseMimeType: 'application/json' },
   });
 
-  if (!response.ok) {
-    const errorBody = await response.text().catch(() => '');
-    throw new Error(`Gemini API returned status ${response.status}: ${errorBody || response.statusText}`);
+  let response: Response | null = null;
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      response = await attemptFetch(url, body);
+
+      if (response.ok) break;
+
+      const errorBody = await response.text().catch(() => '');
+      lastError = new Error(
+        `Gemini API returned status ${response.status}: ${errorBody || response.statusText}`
+      );
+
+      // A 400/403 will fail identically next time — surface it immediately.
+      if (!isRetryable(response.status) || attempt === MAX_ATTEMPTS) throw lastError;
+    } catch (err) {
+      const error = err as Error;
+      // A timeout surfaces as an AbortError; treat it as transient.
+      const aborted = error.name === 'AbortError';
+      lastError = aborted
+        ? new Error(`Gemini API timed out after ${REQUEST_TIMEOUT_MS / 1000}s`)
+        : error;
+
+      if (attempt === MAX_ATTEMPTS) throw lastError;
+    }
+
+    console.warn(`[Gemini] attempt ${attempt} failed (${lastError?.message}); retrying…`);
+    await sleep(RETRY_BACKOFF_MS);
+  }
+
+  if (!response || !response.ok) {
+    throw lastError ?? new Error('Gemini API request failed.');
   }
 
   const resData = (await response.json()) as any;

@@ -61,7 +61,7 @@ export interface Profile {
   createdAt: string;
 }
 
-/** Persisted preferences. No UI yet; all three are read by the app today. */
+/** Persisted preferences. */
 export interface Settings {
   /** Days of chat transcript to keep before pruning. */
   chatRetentionDays: number;
@@ -69,6 +69,10 @@ export interface Settings {
   confettiEnabled: boolean;
   /** Number of days plotted on the history calorie chart. */
   historyGraphDays: number;
+  /** When the user last exported. Null means they never have. */
+  lastBackupAt: string | null;
+  /** Suppresses the backup reminder until this date. */
+  backupSnoozedUntil: string | null;
 }
 
 /** A saved food the user can re-log without re-parsing. Store + service only. */
@@ -91,6 +95,73 @@ export interface ParseCacheEntry {
   response: GeminiResponse;
   cachedAt: string;
 }
+
+/** Macros for exactly one `baseUnit` of a food. */
+export interface PerUnitMacros {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fats: number;
+  sugar: number;
+  fiber: number;
+}
+
+/**
+ * A food this device has learned.
+ *
+ * Built from what the user actually logs, so it is personal by construction —
+ * it never leaves the device and never mixes with anyone else's eating habits.
+ * Storing macros *per unit* is what lets a match be rescaled to any quantity
+ * later via `scaleMacrosByQuantity`.
+ */
+export interface DictionaryEntry {
+  id: string;
+  /** Canonical display name, e.g. "egg" or "britannia whole wheat bread". */
+  name: string;
+  /**
+   * How this food came to be known.
+   *
+   * 'learned'  — inferred from a logged meal; macros are an estimate.
+   * 'scanned'  — read off a nutrition label; macros are the manufacturer's own
+   *              figures, so they are treated as authoritative and never
+   *              overwritten by a later estimate.
+   */
+  kind?: 'learned' | 'scanned';
+  /** Packaged-product details. Present on scanned foods. */
+  brand?: string | null;
+  productName?: string | null;
+  /** Reserved so barcode lookup can be added without a migration. */
+  barcode?: string | null;
+  /** Data URL of the label photo, if the user kept it. */
+  imageUrl?: string | null;
+  /**
+   * Every normalised string that should resolve here. Grows over time: a
+   * mistyped entry the user corrects is added, so the same typo hits exactly
+   * from then on.
+   */
+  aliases: string[];
+  baseUnit: string;
+  perUnit: PerUnitMacros;
+  /** Frequency prior — makes fuzzy matching safe for foods you eat often. */
+  timesLogged: number;
+  lastLoggedAt: string;
+  createdAt: string;
+  /**
+   * Trust ranking for the macros, lowest to highest:
+   *   'gemini' — estimated by the model
+   *   'label'  — read from the packaging
+   *   'user'   — typed by the person themselves
+   * A lower-ranked source never overwrites a higher-ranked one.
+   */
+  source: 'gemini' | 'label' | 'user';
+}
+
+/** How much a given source is trusted; higher wins. */
+export const SOURCE_RANK: Record<DictionaryEntry['source'], number> = {
+  gemini: 0,
+  label: 1,
+  user: 2,
+};
 
 /** Chat messages as persisted (Date is serialised to an ISO string). */
 export type StoredMessage = Omit<Message, 'timestamp'> & { timestamp: string };
@@ -130,6 +201,8 @@ export interface FoodLogDb {
   chat: Record<string, StoredMessage[]>;
   /** Parser results keyed by normalised input text. */
   parseCache: Record<string, ParseCacheEntry>;
+  /** Foods this device has learned from what the user logs. */
+  foodDictionary: DictionaryEntry[];
   meta: {
     createdAt: string;
     updatedAt: string;
@@ -150,6 +223,8 @@ export const DEFAULT_SETTINGS: Settings = {
   chatRetentionDays: 1,
   confettiEnabled: true,
   historyGraphDays: 7,
+  lastBackupAt: null,
+  backupSnoozedUntil: null,
 };
 
 /** UUID with a fallback for non-secure contexts, where randomUUID is absent. */
@@ -178,6 +253,7 @@ export function createEmptyDb(): FoodLogDb {
     favorites: [],
     chat: {},
     parseCache: {},
+    foodDictionary: [],
     meta: {
       createdAt: now,
       updatedAt: now,
@@ -250,6 +326,11 @@ export function normalizeDb(raw: unknown): FoodLogDb {
     favorites: Array.isArray(raw.favorites) ? (raw.favorites as Favorite[]) : [],
     chat: isObject(raw.chat) ? (raw.chat as Record<string, StoredMessage[]>) : {},
     parseCache: isObject(raw.parseCache) ? (raw.parseCache as Record<string, ParseCacheEntry>) : {},
+    // Additive: a store written before the dictionary existed simply gets an
+    // empty list here, which is why this needed no schema migration.
+    foodDictionary: Array.isArray(raw.foodDictionary)
+      ? (raw.foodDictionary.filter(isValidDictionaryEntry) as DictionaryEntry[])
+      : [],
     meta: {
       createdAt: typeof meta.createdAt === 'string' ? meta.createdAt : base.meta.createdAt,
       updatedAt: typeof meta.updatedAt === 'string' ? meta.updatedAt : base.meta.updatedAt,
@@ -269,5 +350,23 @@ function isValidLog(v: unknown): boolean {
     typeof v.id === 'string' &&
     typeof v.name === 'string' &&
     typeof v.date === 'string'
+  );
+}
+
+/**
+ * A dictionary entry is only usable if it can be matched (aliases) and rescaled
+ * (perUnit + baseUnit). Anything missing those would silently produce wrong
+ * macros, so it is dropped rather than repaired.
+ */
+function isValidDictionaryEntry(v: unknown): boolean {
+  if (!isObject(v)) return false;
+  const perUnit = v.perUnit;
+  return (
+    typeof v.id === 'string' &&
+    typeof v.name === 'string' &&
+    Array.isArray(v.aliases) &&
+    typeof v.baseUnit === 'string' &&
+    isObject(perUnit) &&
+    typeof perUnit.calories === 'number'
   );
 }

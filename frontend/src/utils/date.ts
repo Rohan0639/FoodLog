@@ -82,6 +82,41 @@ export function monthBounds(month: string): { start: string; end: string } {
   };
 }
 
+/** A month as a sortable ordinal, so two months can be compared numerically. */
+export function monthOrdinal(year: number, monthIndex: number): number {
+  return year * 12 + monthIndex;
+}
+
+/**
+ * Decides whether a calendar showing `visible` should jump to `selected`, and
+ * which way it should slide.
+ *
+ * Pulled out of the component so the decision is a pure function that can be
+ * tested, and so the component can derive it during render instead of running
+ * an effect that sets state — which caused a second render pass on every date
+ * change and tripped React's cascading-render lint.
+ */
+export function monthTransition(
+  selectedDate: string,
+  visibleYear: number,
+  visibleMonth: number
+): { year: number; month: number; direction: number } | null {
+  const selected = fromIsoDate(selectedDate);
+  if (isNaN(selected.getTime())) return null;
+
+  const selectedYear = selected.getFullYear();
+  const selectedMonth = selected.getMonth();
+
+  if (selectedYear === visibleYear && selectedMonth === visibleMonth) return null;
+
+  return {
+    year: selectedYear,
+    month: selectedMonth,
+    direction:
+      monthOrdinal(selectedYear, selectedMonth) > monthOrdinal(visibleYear, visibleMonth) ? 1 : -1,
+  };
+}
+
 /** Milliseconds from now until the next local midnight. */
 export function msUntilMidnight(from: Date = new Date()): number {
   const midnight = new Date(

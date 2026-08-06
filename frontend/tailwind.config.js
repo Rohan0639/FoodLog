@@ -44,17 +44,14 @@ export default {
         },
 
         /**
-         * Macro identities as a five-step grey ramp.
-         * Each step is >= 4.5:1 against the card surface, and the emoji beside
-         * each label does the work colour used to do.
+         * NOTE: macro identities are NOT Tailwind colours.
+         *
+         * They are the five-step grey ramp defined in `MACRO_META`
+         * (NutritionDashboard) and applied inline, because each one is used at
+         * two opacities — full strength for the label, ~10% for the chip behind
+         * it. Utility classes cannot express that from one token, so a `macro-*`
+         * palette here would only ever be dead config.
          */
-        macro: {
-          protein: '#FFFFFF',
-          carbs:   '#DCDCE0',
-          fat:     '#B8B8C0',
-          sugar:   '#9A9AA3',
-          fiber:   '#7E7E88',
-        },
       },
       fontFamily: {
         sans:    ['Nunito', 'Inter', 'system-ui', '-apple-system', 'sans-serif'],

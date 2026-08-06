@@ -1,9 +1,13 @@
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Check, Flame, PartyPopper, RotateCcw, Target, X } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import {
+  AlertTriangle, BookMarked, Check, ChevronRight, Download, Flame, HardDrive,
+  PartyPopper, RotateCcw, Target, Upload, X,
+} from 'lucide-react';
 import type { DailyGoal } from '../types';
-import { goalService, settingsService } from '../lib/services';
-import {Button, IconButton, Modal} from '../ui/primitives';
+import { backupService, dictionaryService, goalService, settingsService } from '../lib/services';
+import type { BackupSummary } from '../lib/services/backupService';
+import {Button, ConfirmDialog, IconButton, Modal} from '../ui/primitives';
 import { cx } from '../ui/cx';
 import { spring, stagger, listItem } from '../ui/motion';
 
@@ -11,6 +15,7 @@ interface SettingsSheetProps {
   open: boolean;
   onClose: () => void;
   dailyGoal: DailyGoal;
+  onOpenMyFoods: () => void;
 }
 
 const GOAL_FIELDS: { key: keyof DailyGoal; label: string; unit: string; color: string }[] = [
@@ -28,12 +33,68 @@ const GOAL_FIELDS: { key: keyof DailyGoal; label: string; unit: string; color: s
  * Every value here was already persisted by `goalService` / `settingsService`;
  * this screen is the first UI to expose them. No new storage, no new logic.
  */
-export const SettingsSheet: React.FC<SettingsSheetProps> = ({ open, onClose, dailyGoal }) => {
+export const SettingsSheet: React.FC<SettingsSheetProps> = ({
+  open, onClose, dailyGoal, onOpenMyFoods,
+}) => {
   const [draft, setDraft] = useState<DailyGoal>(dailyGoal);
   const [confettiEnabled, setConfettiEnabled] = useState(
     () => settingsService.getSettings().confettiEnabled
   );
   const [saved, setSaved] = useState(false);
+
+  // ── Learned foods ─────────────────────────────────────────────────────
+  const learned = dictionaryService.getAll();
+  const packagedCount = learned.filter((food) => food.kind === 'scanned').length;
+  const totalRecall = learned.reduce((sum, food) => sum + food.timesLogged, 0);
+
+  // ── Backup ────────────────────────────────────────────────────────────
+  const [summary] = useState<BackupSummary>(() => backupService.getSummary());
+  const [exported, setExported] = useState(false);
+  const [restoreError, setRestoreError] = useState<string | null>(null);
+  const [pendingRestore, setPendingRestore] = useState<
+    { serialized: string; summary: BackupSummary } | null
+  >(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleExport = () => {
+    try {
+      backupService.downloadBackup();
+      setExported(true);
+      setTimeout(() => setExported(false), 2000);
+    } catch (err) {
+      console.error('[backup] export failed', err);
+      setRestoreError('Export failed — your browser blocked the download.');
+    }
+  };
+
+  /** Validates the picked file and stages it; nothing is written until confirmed. */
+  const handleFilePicked = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    // Reset so picking the same file twice still fires a change event.
+    event.target.value = '';
+    if (!file) return;
+
+    setRestoreError(null);
+    try {
+      const serialized = await backupService.readFile(file);
+      setPendingRestore({ serialized, summary: backupService.inspect(serialized) });
+    } catch (err) {
+      setRestoreError(err instanceof Error ? err.message : 'That file could not be read.');
+    }
+  };
+
+  const confirmRestore = () => {
+    if (!pendingRestore) return;
+    try {
+      backupService.restore(pendingRestore.serialized);
+      setPendingRestore(null);
+      // A full reload is the honest way to rebuild every view from the new store.
+      window.location.reload();
+    } catch (err) {
+      setPendingRestore(null);
+      setRestoreError(err instanceof Error ? err.message : 'Restore failed.');
+    }
+  };
 
   const setField = (key: keyof DailyGoal, raw: string) => {
     const value = parseFloat(raw);
@@ -141,11 +202,138 @@ export const SettingsSheet: React.FC<SettingsSheetProps> = ({ open, onClose, dai
           </button>
         </motion.div>
 
+        {/* ── My foods ─────────────────────────────────────────────
+            A summary and a way in; the full library has its own screen. */}
+        <motion.div variants={listItem} className="pt-2 space-y-2">
+          <div className="flex items-center gap-2 px-1">
+            <BookMarked className="w-3.5 h-3.5 text-fg-dim shrink-0" />
+            <span className="text-[11px] font-extrabold text-fg-dim uppercase tracking-wide">
+              My foods
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={onOpenMyFoods}
+            className="w-full bg-surface-card rounded-2xl border-2 border-surface-line p-3.5
+                       flex items-center gap-3 text-left hover:border-white/20 transition-colors"
+          >
+            <div className="min-w-0 flex-1">
+              {learned.length === 0 ? (
+                <p className="text-[11px] font-bold text-fg-muted leading-relaxed">
+                  Nothing saved yet. Foods are remembered as you log them, or scan a
+                  nutrition label to add a packaged product.
+                </p>
+              ) : (
+                <p className="text-[11px] font-bold text-fg-muted leading-relaxed">
+                  <span className="text-fg-strong num">{learned.length}</span> food
+                  {learned.length === 1 ? '' : 's'} saved
+                  {packagedCount > 0 && <> · <span className="text-fg-strong num">{packagedCount}</span> scanned</>}
+                  {' · '}
+                  <span className="text-fg-strong num">{totalRecall}</span> log
+                  {totalRecall === 1 ? '' : 's'} resolved without the AI.
+                </p>
+              )}
+            </div>
+            <ChevronRight className="w-4 h-4 text-fg-dim shrink-0" />
+          </button>
+        </motion.div>
+
+        {/* ── Backup ─────────────────────────────────────────────────
+            With no server, an exported file is the only copy that survives
+            clearing site data or changing device. */}
+        <motion.div variants={listItem} className="pt-2 space-y-2">
+          <div className="flex items-center gap-2 px-1">
+            <HardDrive className="w-3.5 h-3.5 text-fg-dim shrink-0" />
+            <span className="text-[11px] font-extrabold text-fg-dim uppercase tracking-wide">
+              Your data
+            </span>
+          </div>
+
+          <div className="bg-surface-card rounded-2xl border-2 border-surface-line p-3.5 space-y-3">
+            <p className="text-[11px] font-bold text-fg-muted leading-relaxed">
+              {summary.entries > 0 ? (
+                <>
+                  <span className="text-fg-strong num">{summary.entries}</span> entries across{' '}
+                  <span className="text-fg-strong num">{summary.days}</span> day
+                  {summary.days === 1 ? '' : 's'}
+                  {summary.learnedFoods > 0 && (
+                    <>
+                      {' · '}
+                      <span className="text-fg-strong num">{summary.learnedFoods}</span> food
+                      {summary.learnedFoods === 1 ? '' : 's'} learned
+                    </>
+                  )}
+                  .
+                </>
+              ) : (
+                'Nothing logged yet.'
+              )}
+            </p>
+
+            <div className="flex gap-2">
+              <Button variant="soft" size="sm" fullWidth onClick={handleExport}>
+                <Download className="w-3.5 h-3.5" />
+                {exported ? 'Saved!' : 'Export'}
+              </Button>
+              <Button variant="soft" size="sm" fullWidth onClick={() => fileInputRef.current?.click()}>
+                <Upload className="w-3.5 h-3.5" />
+                Restore
+              </Button>
+            </div>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              onChange={handleFilePicked}
+            />
+
+            {restoreError && (
+              <p className="text-[11px] font-bold text-accent flex items-start gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
+                {restoreError}
+              </p>
+            )}
+
+            <p className="text-[10px] font-bold text-fg-faint leading-relaxed">
+              Export writes a JSON file you can keep anywhere. Restoring replaces
+              everything currently on this device.
+            </p>
+          </div>
+        </motion.div>
+
         <motion.p variants={listItem} className="text-[11px] text-fg-dim font-bold leading-relaxed px-1 pt-1">
           <Flame className="w-3 h-3 inline mb-0.5 mr-1 text-accent-dim" />
           Everything stays on this device — nothing is uploaded.
         </motion.p>
       </motion.div>
+
+      {/* Restoring overwrites the whole store, so it is confirmed explicitly
+          and the summary of the incoming file is shown first. */}
+      <AnimatePresence>
+        {pendingRestore && (
+          <ConfirmDialog
+            key="confirm-restore"
+            open={!!pendingRestore}
+            icon={<Upload className="w-7 h-7" />}
+            title="Restore this backup?"
+            message={
+              `This file holds ${pendingRestore.summary.entries} entries across ` +
+              `${pendingRestore.summary.days} days` +
+              (pendingRestore.summary.firstDate
+                ? ` (${pendingRestore.summary.firstDate} to ${pendingRestore.summary.lastDate})`
+                : '') +
+              `. It will replace the ${summary.entries} entries currently on this device.`
+            }
+            confirmLabel="Restore"
+            cancelLabel="Cancel"
+            onConfirm={confirmRestore}
+            onCancel={() => setPendingRestore(null)}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Actions */}
       <div className="flex gap-2.5 px-5 pb-6 pt-1 shrink-0" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
