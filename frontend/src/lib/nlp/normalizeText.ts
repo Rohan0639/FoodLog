@@ -96,6 +96,14 @@ export interface ParsedPhrase {
   foodKey: string;
   /** The food words before singularisation, for display. */
   foodText: string;
+  /**
+   * Singularised food words, unsorted.
+   *
+   * Lets a partial name find a longer one: "bread" is a subset of
+   * {britannia, whole, wheat, bread}, which token-sorted key equality cannot
+   * express.
+   */
+  foodTokens: string[];
 }
 
 /**
@@ -110,7 +118,7 @@ export interface ParsedPhrase {
 export function parsePhrase(input: string): ParsedPhrase {
   const cleaned = basicClean(input);
   if (!cleaned) {
-    return { quantity: null, unit: null, foodKey: '', foodText: '' };
+    return { quantity: null, unit: null, foodKey: '', foodText: '', foodTokens: [] };
   }
 
   // "300g" / "1.5kg" — a number glued to a unit needs splitting first.
@@ -164,9 +172,15 @@ export function parsePhrase(input: string): ParsedPhrase {
   if (quantity === null && weakQuantity !== null) quantity = weakQuantity;
 
   const foodText = foodTokens.join(' ');
-  const foodKey = foodTokens.map(singularise).sort().join(' ');
+  const stems = foodTokens.map(singularise);
+  const foodKey = [...stems].sort().join(' ');
 
-  return { quantity, unit, foodKey, foodText };
+  return { quantity, unit, foodKey, foodText, foodTokens: stems };
+}
+
+/** Singularised, de-duplicated words of a food name — its searchable tokens. */
+export function tokensOf(text: string): string[] {
+  return Array.from(new Set(parsePhrase(text).foodTokens));
 }
 
 /**

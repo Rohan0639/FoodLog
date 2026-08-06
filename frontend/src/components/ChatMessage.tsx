@@ -85,6 +85,15 @@ const ChatMessageBase: React.FC<ChatMessageProps> = ({
           }`}
           style={{ fontSize: 'var(--fs-sm)' }}
         >
+          {/* An attached nutrition label, shown as part of the message */}
+          {message.attachmentUrl && (
+            <img
+              src={message.attachmentUrl}
+              alt="Attached nutrition label"
+              className="w-full max-w-[180px] rounded-2xl mb-2 border border-black/10"
+            />
+          )}
+
           {message.isTyping ? (
             <div className="flex items-center gap-1.5 py-1 px-0.5">
               {[0, 1, 2].map((i) => (

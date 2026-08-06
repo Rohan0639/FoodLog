@@ -1,13 +1,12 @@
 import React, { useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  AlertTriangle, BookMarked, Check, Download, Flame, HardDrive, PartyPopper,
-  RotateCcw, Target, Upload, X,
+  AlertTriangle, BookMarked, Check, ChevronRight, Download, Flame, HardDrive,
+  PartyPopper, RotateCcw, Target, Upload, X,
 } from 'lucide-react';
 import type { DailyGoal } from '../types';
 import { backupService, dictionaryService, goalService, settingsService } from '../lib/services';
 import type { BackupSummary } from '../lib/services/backupService';
-import type { DictionaryEntry } from '../lib/storage/schema';
 import {Button, ConfirmDialog, IconButton, Modal} from '../ui/primitives';
 import { cx } from '../ui/cx';
 import { spring, stagger, listItem } from '../ui/motion';
@@ -16,6 +15,7 @@ interface SettingsSheetProps {
   open: boolean;
   onClose: () => void;
   dailyGoal: DailyGoal;
+  onOpenMyFoods: () => void;
 }
 
 const GOAL_FIELDS: { key: keyof DailyGoal; label: string; unit: string; color: string }[] = [
@@ -33,7 +33,9 @@ const GOAL_FIELDS: { key: keyof DailyGoal; label: string; unit: string; color: s
  * Every value here was already persisted by `goalService` / `settingsService`;
  * this screen is the first UI to expose them. No new storage, no new logic.
  */
-export const SettingsSheet: React.FC<SettingsSheetProps> = ({ open, onClose, dailyGoal }) => {
+export const SettingsSheet: React.FC<SettingsSheetProps> = ({
+  open, onClose, dailyGoal, onOpenMyFoods,
+}) => {
   const [draft, setDraft] = useState<DailyGoal>(dailyGoal);
   const [confettiEnabled, setConfettiEnabled] = useState(
     () => settingsService.getSettings().confettiEnabled
@@ -41,14 +43,9 @@ export const SettingsSheet: React.FC<SettingsSheetProps> = ({ open, onClose, dai
   const [saved, setSaved] = useState(false);
 
   // ── Learned foods ─────────────────────────────────────────────────────
-  const [learned, setLearned] = useState<DictionaryEntry[]>(() => dictionaryService.getAll());
-  const [showFoods, setShowFoods] = useState(false);
+  const learned = dictionaryService.getAll();
+  const packagedCount = learned.filter((food) => food.kind === 'scanned').length;
   const totalRecall = learned.reduce((sum, food) => sum + food.timesLogged, 0);
-
-  const handleForget = (id: string) => {
-    dictionaryService.remove(id);
-    setLearned(dictionaryService.getAll());
-  };
 
   // ── Backup ────────────────────────────────────────────────────────────
   const [summary] = useState<BackupSummary>(() => backupService.getSummary());
@@ -205,80 +202,41 @@ export const SettingsSheet: React.FC<SettingsSheetProps> = ({ open, onClose, dai
           </button>
         </motion.div>
 
-        {/* ── Learned foods ──────────────────────────────────────────
-            The dictionary decides what resolves without an API call, so it
-            needs to be inspectable and correctable. A wrong entry would
-            otherwise repeat itself silently forever. */}
+        {/* ── My foods ─────────────────────────────────────────────
+            A summary and a way in; the full library has its own screen. */}
         <motion.div variants={listItem} className="pt-2 space-y-2">
-          <div className="flex items-center justify-between gap-2 px-1">
-            <div className="flex items-center gap-2">
-              <BookMarked className="w-3.5 h-3.5 text-fg-dim shrink-0" />
-              <span className="text-[11px] font-extrabold text-fg-dim uppercase tracking-wide">
-                Learned foods
-              </span>
-            </div>
-            {learned.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setShowFoods((v) => !v)}
-                className="text-[11px] font-extrabold text-accent"
-              >
-                {showFoods ? 'Hide' : `Show ${learned.length}`}
-              </button>
-            )}
+          <div className="flex items-center gap-2 px-1">
+            <BookMarked className="w-3.5 h-3.5 text-fg-dim shrink-0" />
+            <span className="text-[11px] font-extrabold text-fg-dim uppercase tracking-wide">
+              My foods
+            </span>
           </div>
 
-          <div className="bg-surface-card rounded-2xl border-2 border-surface-line p-3.5 space-y-2.5">
-            {learned.length === 0 ? (
-              <p className="text-[11px] font-bold text-fg-muted leading-relaxed">
-                Nothing learned yet. Foods you log get remembered here, and are then
-                recognised instantly without asking the AI.
-              </p>
-            ) : (
-              <p className="text-[11px] font-bold text-fg-muted leading-relaxed">
-                <span className="text-fg-strong num">{learned.length}</span> food
-                {learned.length === 1 ? '' : 's'} remembered ·{' '}
-                <span className="text-fg-strong num">{totalRecall}</span> log
-                {totalRecall === 1 ? '' : 's'} resolved without the AI.
-              </p>
-            )}
-
-            <AnimatePresence initial={false}>
-              {showFoods && learned.length > 0 && (
-                <motion.ul
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="overflow-hidden space-y-1.5 max-h-56 overflow-y-auto"
-                >
-                  {learned.map((food) => (
-                    <li
-                      key={food.id}
-                      className="flex items-center gap-2 bg-surface-inset rounded-xl px-2.5 py-2"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <span className="block text-xs font-extrabold text-fg-base capitalize truncate">
-                          {food.name}
-                        </span>
-                        <span className="block text-[10px] font-bold text-fg-dim num">
-                          {food.perUnit.calories} kcal / {food.baseUnit} · logged{' '}
-                          {food.timesLogged}×{food.source === 'user' ? ' · edited' : ''}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleForget(food.id)}
-                        aria-label={`Forget ${food.name}`}
-                        className="p-1 text-fg-dim hover:text-accent shrink-0"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </li>
-                  ))}
-                </motion.ul>
+          <button
+            type="button"
+            onClick={onOpenMyFoods}
+            className="w-full bg-surface-card rounded-2xl border-2 border-surface-line p-3.5
+                       flex items-center gap-3 text-left hover:border-white/20 transition-colors"
+          >
+            <div className="min-w-0 flex-1">
+              {learned.length === 0 ? (
+                <p className="text-[11px] font-bold text-fg-muted leading-relaxed">
+                  Nothing saved yet. Foods are remembered as you log them, or scan a
+                  nutrition label to add a packaged product.
+                </p>
+              ) : (
+                <p className="text-[11px] font-bold text-fg-muted leading-relaxed">
+                  <span className="text-fg-strong num">{learned.length}</span> food
+                  {learned.length === 1 ? '' : 's'} saved
+                  {packagedCount > 0 && <> · <span className="text-fg-strong num">{packagedCount}</span> scanned</>}
+                  {' · '}
+                  <span className="text-fg-strong num">{totalRecall}</span> log
+                  {totalRecall === 1 ? '' : 's'} resolved without the AI.
+                </p>
               )}
-            </AnimatePresence>
-          </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-fg-dim shrink-0" />
+          </button>
         </motion.div>
 
         {/* ── Backup ─────────────────────────────────────────────────

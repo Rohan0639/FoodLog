@@ -38,9 +38,9 @@ export interface FoodEntry {
   sugarPerUnit?: number;
   fiberPerUnit?: number;
   aliases?: string[];
-  source?: 'dictionary' | 'ai';
+  source?: 'dictionary' | 'ai' | 'label';
   matchConfidence?: number;
-  matchStage?: 'exact' | 'fuzzy';
+  matchStage?: 'exact' | 'partial' | 'fuzzy';
   /** Raw text the user typed for this item; learned as an alias on confirm. */
   sourceText?: string;
 }
@@ -67,10 +67,10 @@ export interface ParsedItem {
   fiberPerUnit?: number;
   aliases?: string[];
   /** Where this item came from — drives the review-table badge. */
-  source?: 'dictionary' | 'ai';
+  source?: 'dictionary' | 'ai' | 'label';
   /** 0..1 for a fuzzy dictionary guess; 1 for an exact hit. */
   matchConfidence?: number;
-  matchStage?: 'exact' | 'fuzzy';
+  matchStage?: 'exact' | 'partial' | 'fuzzy';
   /**
    * The exact fragment the user typed for this item. Learned as an alias on
    * confirm, which is how a mistyped spelling becomes an exact hit next time.
@@ -105,6 +105,8 @@ export interface Message {
   pendingFoods?: FoodEntry[];
   isConfirmed?: boolean;
   isDiscarded?: boolean;
+  /** Data URL of a nutrition label the user attached to this message. */
+  attachmentUrl?: string;
 }
 
 export interface NutritionSummary {

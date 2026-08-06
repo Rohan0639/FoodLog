@@ -20,7 +20,7 @@ import { parsePhrase, splitParts, surfaceForms } from '../nlp/normalizeText';
 import { findBestMatch } from '../nlp/fuzzy';
 import * as dictionaryService from '../services/dictionaryService';
 
-export type MatchStage = 'exact' | 'fuzzy';
+export type MatchStage = 'exact' | 'partial' | 'fuzzy';
 
 export interface LocalMatch {
   /** The phrase fragment the user actually typed. */
@@ -75,6 +75,22 @@ export function matchPhrase(text: string): LocalParseResult {
         unit: parsed.unit ?? exact.baseUnit,
         confidence: 1,
         stage: 'exact',
+      });
+      continue;
+    }
+
+    // Stage 2.5: part of a longer name — "bread" naming "britannia whole wheat
+    // bread". Still deterministic: every word must be present, and a tie
+    // between two products is refused rather than guessed.
+    const partial = dictionaryService.findByTokens(parsed.foodKey);
+    if (partial) {
+      matched.push({
+        sourceText: part,
+        entry: partial.entry,
+        quantity: parsed.quantity ?? 1,
+        unit: parsed.unit ?? partial.entry.baseUnit,
+        confidence: partial.specificity,
+        stage: 'partial',
       });
       continue;
     }
@@ -185,6 +201,11 @@ export function totalsFor(items: ParsedItem[]) {
 }
 
 /** A response assembled entirely from the local dictionary. */
+/** True when any item was a guess rather than a definite match. */
+export function anyGuessed(matches: LocalMatch[]): boolean {
+  return matches.some((match) => match.stage === 'fuzzy');
+}
+
 export function buildResponse(items: ParsedItem[], anyGuessed: boolean): GeminiResponse {
   const names = items.map((item) => `${item.quantity} of ${item.name}`).join(' and ');
   return {

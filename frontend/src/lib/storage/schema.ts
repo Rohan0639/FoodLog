@@ -116,8 +116,24 @@ export interface PerUnitMacros {
  */
 export interface DictionaryEntry {
   id: string;
-  /** Canonical display name, e.g. "egg". */
+  /** Canonical display name, e.g. "egg" or "britannia whole wheat bread". */
   name: string;
+  /**
+   * How this food came to be known.
+   *
+   * 'learned'  — inferred from a logged meal; macros are an estimate.
+   * 'scanned'  — read off a nutrition label; macros are the manufacturer's own
+   *              figures, so they are treated as authoritative and never
+   *              overwritten by a later estimate.
+   */
+  kind?: 'learned' | 'scanned';
+  /** Packaged-product details. Present on scanned foods. */
+  brand?: string | null;
+  productName?: string | null;
+  /** Reserved so barcode lookup can be added without a migration. */
+  barcode?: string | null;
+  /** Data URL of the label photo, if the user kept it. */
+  imageUrl?: string | null;
   /**
    * Every normalised string that should resolve here. Grows over time: a
    * mistyped entry the user corrects is added, so the same typo hits exactly
@@ -131,11 +147,21 @@ export interface DictionaryEntry {
   lastLoggedAt: string;
   createdAt: string;
   /**
-   * 'user' outranks 'gemini': once someone has corrected the macros by hand,
-   * a later parse must not silently overwrite them.
+   * Trust ranking for the macros, lowest to highest:
+   *   'gemini' — estimated by the model
+   *   'label'  — read from the packaging
+   *   'user'   — typed by the person themselves
+   * A lower-ranked source never overwrites a higher-ranked one.
    */
-  source: 'gemini' | 'user';
+  source: 'gemini' | 'label' | 'user';
 }
+
+/** How much a given source is trusted; higher wins. */
+export const SOURCE_RANK: Record<DictionaryEntry['source'], number> = {
+  gemini: 0,
+  label: 1,
+  user: 2,
+};
 
 /** Chat messages as persisted (Date is serialised to an ISO string). */
 export type StoredMessage = Omit<Message, 'timestamp'> & { timestamp: string };
