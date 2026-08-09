@@ -31,9 +31,25 @@ locally, and the sync section in Settings explains that it is switched off.
    per-app folder and **cannot read any of your other Drive files.**
 4. Add your own Google account under **Test users**
 
-> While the app is in "Testing", only accounts listed as test users can sign in.
-> That is usually what you want. Publishing is only needed to open it to others,
-> and Google requires verification for that.
+> ### This is the step everyone misses
+>
+> While the client is in **Testing**, Google blocks *every* account that is not
+> on the test-user list — including the one that created the project. You get:
+>
+> ```
+> Error 403: access_denied
+> FoodLog has not completed the Google verification process
+> ```
+>
+> The fix is not in the code. Go to **Google Auth Platform → Audience**
+> (older console: **APIs & Services → OAuth consent screen**), find
+> **Test users**, and add every Google account you will sign in with — one per
+> device is not needed, but each *account* is. Up to 100.
+>
+> Testing mode is the right choice for personal use. Moving to **Production**
+> avoids the list, but `drive.appdata` is a scope Google treats as sensitive,
+> so unverified apps show an "unverified app" warning that users must click
+> past. For a diary you and a few others use, test users is cleaner.
 
 ## 4. Create the OAuth client
 
@@ -108,10 +124,15 @@ and when it last succeeded.
 
 | Message | Cause |
 |---|---|
+| **403 `access_denied`** — "has not completed the Google verification process" | The account is not on the **Test users** list. See step 3 — this is the most common failure by a wide margin |
+| **`redirect_uri_mismatch`**, or the popup closes instantly | The origin is missing from **Authorised JavaScript origins**. It must match exactly, including port: `http://localhost:5173` |
 | "Google sign-in expired" | Token lapsed — sign in again |
-| "Google Drive refused the request" | Scope not granted, or account is not a test user |
+| "Google Drive refused the request" | Scope not granted on the consent screen |
 | "Google Drive is busy" | Rate-limited or a temporary outage; it retries |
 | "The file in Drive is not a FoodLog backup" | Something else wrote to the file; sync stops rather than merge it |
+
+None of these are code faults — every one is a setting in the Google Cloud
+Console, and the app is reporting Google's answer faithfully.
 
 **Export is still your real backup.** Sync mirrors your data; it does not
 replace a copy you hold yourself. If you delete a meal it disappears everywhere,
