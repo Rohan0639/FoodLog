@@ -42,6 +42,13 @@ export interface FoodLogRecord {
   id: string;
   date: string;
   createdAt: string;
+  /**
+   * When this record last changed.
+   *
+   * The deciding vote when two devices hold different versions of the same
+   * entry. Back-filled from `createdAt` for records written before syncing
+   * existed, so nothing already logged is at a disadvantage.
+   */
   updatedAt?: string;
   name: string;
   quantity: number;
@@ -146,6 +153,8 @@ export interface DictionaryEntry {
   timesLogged: number;
   lastLoggedAt: string;
   createdAt: string;
+  /** See `FoodLogRecord.updatedAt` — same role, same back-fill. */
+  updatedAt?: string;
   /**
    * Trust ranking for the macros, lowest to highest:
    *   'gemini' — estimated by the model
@@ -154,6 +163,41 @@ export interface DictionaryEntry {
    * A lower-ranked source never overwrites a higher-ranked one.
    */
   source: 'gemini' | 'label' | 'user';
+}
+
+/** Collections whose records are reconciled between devices. */
+export type SyncedCollection = 'log' | 'dictionary' | 'favorite';
+
+/**
+ * A record of something deleted.
+ *
+ * Without these, deleting is invisible to other devices: your phone removes a
+ * meal, then your laptop — which still holds it — pushes it straight back on
+ * the next sync. A deletion has to be a fact that travels, not the absence of
+ * one.
+ *
+ * Kept as a separate list rather than a flag on each record, so every existing
+ * query keeps working untouched. A missed filter would mean deleted food
+ * silently reappearing in someone's diary.
+ */
+export interface Tombstone {
+  id: string;
+  collection: SyncedCollection;
+  deletedAt: string;
+}
+
+/** Tombstones older than this are dropped; every device has long since seen them. */
+export const TOMBSTONE_RETENTION_DAYS = 90;
+
+/** Where the diary is mirrored so other devices can reach it. */
+export interface SyncState {
+  /** Google account email, purely so the UI can show who is signed in. */
+  account: string | null;
+  /** Drive file id holding the mirror. */
+  fileId: string | null;
+  /** Last successful sync. */
+  lastSyncedAt: string | null;
+  lastError: string | null;
 }
 
 /** How much a given source is trusted; higher wins. */
@@ -203,10 +247,13 @@ export interface FoodLogDb {
   parseCache: Record<string, ParseCacheEntry>;
   /** Foods this device has learned from what the user logs. */
   foodDictionary: DictionaryEntry[];
+  /** Deletions that still need to reach other devices. */
+  tombstones: Tombstone[];
   meta: {
     createdAt: string;
     updatedAt: string;
     migration: MigrationState;
+    sync: SyncState;
   };
 }
 
@@ -254,6 +301,7 @@ export function createEmptyDb(): FoodLogDb {
     chat: {},
     parseCache: {},
     foodDictionary: [],
+    tombstones: [],
     meta: {
       createdAt: now,
       updatedAt: now,
@@ -265,6 +313,7 @@ export function createEmptyDb(): FoodLogDb {
         importedChatDays: 0,
         legacyKeys: [],
       },
+      sync: { account: null, fileId: null, lastSyncedAt: null, lastError: null },
     },
   };
 }
@@ -320,7 +369,9 @@ export function normalizeDb(raw: unknown): FoodLogDb {
       name: typeof profile.name === 'string' ? profile.name : base.profile.name,
       createdAt: typeof profile.createdAt === 'string' ? profile.createdAt : base.profile.createdAt,
     },
-    logs: Array.isArray(raw.logs) ? (raw.logs.filter(isValidLog) as FoodLogRecord[]) : [],
+    logs: Array.isArray(raw.logs)
+      ? (raw.logs.filter(isValidLog).map(withUpdatedAt) as FoodLogRecord[])
+      : [],
     goals: { ...base.goals, ...(isObject(raw.goals) ? raw.goals : {}) },
     settings: { ...base.settings, ...(isObject(raw.settings) ? raw.settings : {}) },
     favorites: Array.isArray(raw.favorites) ? (raw.favorites as Favorite[]) : [],
@@ -329,7 +380,12 @@ export function normalizeDb(raw: unknown): FoodLogDb {
     // Additive: a store written before the dictionary existed simply gets an
     // empty list here, which is why this needed no schema migration.
     foodDictionary: Array.isArray(raw.foodDictionary)
-      ? (raw.foodDictionary.filter(isValidDictionaryEntry) as DictionaryEntry[])
+      ? (raw.foodDictionary
+          .filter(isValidDictionaryEntry)
+          .map(withUpdatedAt) as DictionaryEntry[])
+      : [],
+    tombstones: Array.isArray(raw.tombstones)
+      ? (raw.tombstones.filter(isValidTombstone) as Tombstone[])
       : [],
     meta: {
       createdAt: typeof meta.createdAt === 'string' ? meta.createdAt : base.meta.createdAt,
@@ -339,8 +395,33 @@ export function normalizeDb(raw: unknown): FoodLogDb {
         ...(migration as Partial<MigrationState>),
         legacyKeys: Array.isArray(migration.legacyKeys) ? (migration.legacyKeys as string[]) : [],
       },
+      sync: { ...base.meta.sync, ...(isObject(meta.sync) ? meta.sync : {}) },
     },
   });
+}
+
+/**
+ * Gives a record an `updatedAt` if it predates syncing.
+ *
+ * Everything already in someone's diary was written before this field existed.
+ * Falling back to when it was created — rather than to "now" — means an old
+ * local entry never spuriously outranks a genuinely newer one from another
+ * device.
+ */
+function withUpdatedAt<T extends { createdAt?: string; lastLoggedAt?: string; updatedAt?: string }>(
+  record: T
+): T {
+  if (record.updatedAt) return record;
+  return { ...record, updatedAt: record.lastLoggedAt ?? record.createdAt ?? new Date(0).toISOString() };
+}
+
+function isValidTombstone(v: unknown): boolean {
+  return (
+    isObject(v) &&
+    typeof v.id === 'string' &&
+    typeof v.collection === 'string' &&
+    typeof v.deletedAt === 'string'
+  );
 }
 
 /** A record is kept only if the fields every query and render path depends on exist. */

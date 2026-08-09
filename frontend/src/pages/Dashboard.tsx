@@ -16,6 +16,7 @@ import { useChatMessages } from '../hooks/useChatMessages';
 import { useFoodLog } from '../hooks/useFoodLog';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { useDbRevision } from '../hooks/useDbRevision';
+import { useAutoSync } from '../hooks/useAutoSync';
 import Navbar from '../components/Navbar';
 import FoodLogger from '../components/FoodLogger';
 import { NutritionDashboard } from '../components/NutritionDashboard';
@@ -144,6 +145,8 @@ export default function Dashboard() {
   const [todayDateStr, setTodayDateStr] = useState<string>(getTodayDate());
   const revision = useDbRevision();
   const isOnline = useOnlineStatus();
+  // Mirrors the diary to the user's Drive, if they have connected one.
+  useAutoSync();
 
   const { messages, setMessages } = useChatMessages(todayDateStr);
   const { logs, addEntries, updateEntry, deleteEntry, clearDay } = useFoodLog(todayDateStr);

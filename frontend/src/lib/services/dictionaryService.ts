@@ -17,6 +17,7 @@ import {
 import type { FoodEntry } from '../../types';
 import { getCurrentIsoString } from '../../utils/date';
 import { foodKey, tokensOf } from '../nlp/normalizeText';
+import * as tombstones from '../sync/tombstones';
 
 /** Beyond this, the least recently used entries are dropped. */
 const MAX_ENTRIES = 2000;
@@ -269,6 +270,7 @@ export function learn(
         timesLogged: 1,
         lastLoggedAt: now,
         createdAt: now,
+        updatedAt: now,
         source,
         ...packaging,
       };
@@ -288,6 +290,7 @@ export function learn(
       perUnit: keepExistingMacros ? existing.perUnit : derived.perUnit,
       timesLogged: existing.timesLogged + 1,
       lastLoggedAt: now,
+      updatedAt: now,
       source: keepExistingMacros ? existing.source : source,
       // Packaging details are only recorded when the panel itself was the
       // source, and never erased by a later estimate of the same food.
@@ -329,7 +332,7 @@ export function addAlias(entryId: string, rawText: string): void {
     ...db,
     foodDictionary: db.foodDictionary.map((entry) =>
       entry.id === entryId && !entry.aliases.includes(key)
-        ? { ...entry, aliases: [...entry.aliases, key] }
+        ? { ...entry, aliases: [...entry.aliases, key], updatedAt: getCurrentIsoString() }
         : entry
     ),
   }));
@@ -413,6 +416,7 @@ export function savePackagedFood(input: PackagedFoodInput): DictionaryEntry | nu
       timesLogged: existingIndex === -1 ? 0 : db.foodDictionary[existingIndex].timesLogged,
       lastLoggedAt: existingIndex === -1 ? now : db.foodDictionary[existingIndex].lastLoggedAt,
       createdAt: existingIndex === -1 ? now : db.foodDictionary[existingIndex].createdAt,
+      updatedAt: now,
       source: 'label',
     };
 
@@ -471,6 +475,7 @@ export function update(entryId: string, patch: Partial<PackagedFoodInput>): Dict
           : entry.perUnit,
         // A hand edit is the highest authority there is.
         source: 'user',
+        updatedAt: getCurrentIsoString(),
       };
 
       // Keep the new name findable.
@@ -487,6 +492,7 @@ export function update(entryId: string, patch: Partial<PackagedFoodInput>): Dict
 }
 
 export function remove(entryId: string): void {
+  tombstones.record('dictionary', [entryId]);
   updateDb((db) => ({
     ...db,
     foodDictionary: db.foodDictionary.filter((entry) => entry.id !== entryId),
@@ -494,6 +500,7 @@ export function remove(entryId: string): void {
 }
 
 export function clear(): void {
+  tombstones.record('dictionary', readDb().foodDictionary.map((entry) => entry.id));
   updateDb((db) => ({ ...db, foodDictionary: [] }));
 }
 

@@ -7,6 +7,7 @@ import {
 import type { DailyGoal } from '../types';
 import { backupService, dictionaryService, goalService, settingsService } from '../lib/services';
 import type { BackupSummary } from '../lib/services/backupService';
+import { SyncSection } from './SyncSection';
 import {Button, ConfirmDialog, IconButton, Modal} from '../ui/primitives';
 import { cx } from '../ui/cx';
 import { spring, stagger, listItem } from '../ui/motion';
@@ -238,6 +239,8 @@ export const SettingsSheet: React.FC<SettingsSheetProps> = ({
             <ChevronRight className="w-4 h-4 text-fg-dim shrink-0" />
           </button>
         </motion.div>
+
+        <SyncSection />
 
         {/* ── Backup ─────────────────────────────────────────────────
             With no server, an exported file is the only copy that survives

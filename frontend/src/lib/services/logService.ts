@@ -10,6 +10,7 @@ import { readDb, updateDb } from '../storage/localDb';
 import { newId, type FoodLogRecord } from '../storage/schema';
 import type { FoodEntry } from '../../types';
 import { getCurrentIsoString, monthBounds, parseLocalDateString } from '../../utils/date';
+import * as tombstones from '../sync/tombstones';
 
 type SortOrder = 'asc' | 'desc';
 
@@ -33,6 +34,9 @@ export function toRecord(entry: FoodEntry): FoodLogRecord {
     id: entry.id || newId(),
     date: parseLocalDateString(createdAt),
     createdAt,
+    // Stamped on creation so a record is comparable against another device's
+    // copy from the very first sync.
+    updatedAt: createdAt,
     name: entry.name || 'Unknown',
     quantity: entry.quantity,
     unit: entry.unit,
@@ -141,13 +145,16 @@ export function updateLog(entry: FoodEntry): FoodLogRecord | null {
   return updated;
 }
 
-/** Removes one entry by id. */
+/** Removes one entry by id, leaving a tombstone so other devices follow suit. */
 export function deleteLog(id: string): void {
+  tombstones.record('log', [id]);
   updateDb((db) => ({ ...db, logs: db.logs.filter((log) => log.id !== id) }));
 }
 
 /** Removes every entry for one day. */
 export function clearDate(date: string): void {
+  const doomed = readDb().logs.filter((log) => log.date === date).map((log) => log.id);
+  tombstones.record('log', doomed);
   updateDb((db) => ({ ...db, logs: db.logs.filter((log) => log.date !== date) }));
 }
 
