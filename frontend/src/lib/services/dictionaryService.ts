@@ -53,16 +53,34 @@ export function getPackaged(): DictionaryEntry[] {
   return getAll().filter((entry) => entry.kind === 'scanned');
 }
 
-/** Every searchable word for an entry: its name, brand and product name. */
+/**
+ * Words that may be used to name this entry *partially*.
+ *
+ * Aliases are deliberately excluded. An alias is a whole-name synonym, good for
+ * exact lookup, but its individual words are not: an egg listing "chicken egg"
+ * as an alias would otherwise contribute the word "chicken" and answer to it.
+ * That is precisely how typing "chicken" once logged an egg.
+ */
 function entryTokens(entry: DictionaryEntry): string[] {
   return Array.from(
     new Set([
       ...tokensOf(entry.name),
       ...(entry.brand ? tokensOf(entry.brand) : []),
       ...(entry.productName ? tokensOf(entry.productName) : []),
-      ...entry.aliases.flatMap(tokensOf),
     ])
   );
+}
+
+/**
+ * The word that says what the food *is*.
+ *
+ * English puts the head noun last: "chicken soup" is a soup, "whole wheat
+ * bread" is a bread. A query that omits it is naming something else —
+ * "chicken" is not chicken soup — so a partial match must always include it.
+ */
+function headNoun(entry: DictionaryEntry): string | null {
+  const words = tokensOf(entry.productName || entry.name);
+  return words.length > 0 ? words[words.length - 1] : null;
 }
 
 export interface TokenMatch {
@@ -94,6 +112,11 @@ export function findByTokens(query: string): TokenMatch | null {
 
     const contained = queryTokens.every((token) => tokens.includes(token));
     if (!contained) continue;
+
+    // Naming only a modifier ("chicken" for chicken soup) is not naming the
+    // food. The head noun has to be there.
+    const head = headNoun(entry);
+    if (head && !queryTokens.includes(head)) continue;
 
     candidates.push({ entry, specificity: queryTokens.length / tokens.length });
   }
