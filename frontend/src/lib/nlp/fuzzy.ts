@@ -1,3 +1,5 @@
+import { isKnownFoodPhrase } from './foodVocabulary';
+
 /**
  * Approximate string matching for mistyped food names.
  *
@@ -137,6 +139,31 @@ function frequencyBoost(timesLogged: number): number {
 }
 
 /**
+ * Whether two strings are even the same *shape* — a prerequisite for one being
+ * a misspelling of the other.
+ *
+ * This exists because Jaro-Winkler rewards a shared prefix so strongly that a
+ * short query scores ~0.92 against any longer name beginning with it:
+ * "chicken" vs "chicken soup" scores 0.917, comfortably over the threshold.
+ * That is correct for the metric and wrong for the purpose. Typing "chicken"
+ * once logged an egg this way, because the egg listed "chicken egg" as an
+ * alias.
+ *
+ * A typo keeps the word count and changes the length by a character or two.
+ * Anything else is a different phrase, and belongs to the containment stage or
+ * to the parser — not here.
+ */
+function couldBeTypoOf(query: string, alias: string): boolean {
+  const queryWords = query.split(' ').length;
+  const aliasWords = alias.split(' ').length;
+  if (queryWords !== aliasWords) return false;
+
+  const longest = Math.max(query.length, alias.length);
+  const allowedDrift = Math.max(2, Math.ceil(longest * 0.25));
+  return Math.abs(query.length - alias.length) <= allowedDrift;
+}
+
+/**
  * Best match for a query, or null when the evidence is not good enough.
  *
  * Returns null rather than a weak guess in three situations: nothing scored
@@ -149,12 +176,25 @@ export function findBestMatch(
 ): FuzzyResult | null {
   if (!query || candidates.length === 0) return null;
 
+  /*
+   * The user typed a real food, so they meant it.
+   *
+   * Letter distance cannot separate a misspelling from a different food:
+   * "pear" and "peas" are as close as "gss" and "eggs". What separates them is
+   * that "pear" means something. Correcting a word that is already a food
+   * would silently log the wrong meal, so anything recognisable is handed to
+   * the parser instead, which can actually tell chicken from egg.
+   */
+  if (isKnownFoodPhrase(query)) return null;
+
   const scored: FuzzyResult[] = [];
 
   for (const candidate of candidates) {
     let best: FuzzyResult | null = null;
 
     for (const alias of candidate.aliases) {
+      if (!couldBeTypoOf(query, alias)) continue;
+
       const sim = similarity(query, alias);
       const confidence = sim * 0.85 + frequencyBoost(candidate.timesLogged);
       if (!best || confidence > best.confidence) {

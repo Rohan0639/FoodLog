@@ -117,3 +117,65 @@ describe('findBestMatch — refuses', () => {
     ])).toBeNull();
   });
 });
+
+describe('shape guard — a typo is not a different phrase', () => {
+  it('refuses a query that is merely a prefix of a longer name', () => {
+    // Jaro-Winkler scores "chicken" vs "chicken soup" at 0.917 on prefix alone.
+    // Without the guard this logged the wrong food.
+    expect(findBestMatch('chicken', [
+      { id: 'soup', aliases: ['chicken soup'], timesLogged: 20 },
+    ])).toBeNull();
+  });
+
+  it('refuses a word borrowed from a multi-word alias', () => {
+    expect(findBestMatch('chicken', [
+      { id: 'egg', aliases: ['egg', 'chicken egg'], timesLogged: 20 },
+    ])).toBeNull();
+  });
+
+  it('still accepts genuine single-word typos', () => {
+    for (const [typo, word] of [['bananna', 'banana'], ['chiken', 'chicken'], ['chikcen', 'chicken']]) {
+      expect(findBestMatch(typo, [{ id: word, aliases: [word], timesLogged: 10 }]), typo).not.toBeNull();
+    }
+  });
+
+  it('still accepts a typo inside a multi-word name', () => {
+    expect(findBestMatch('britannia bred', [
+      { id: 'b', aliases: ['britannia bread'], timesLogged: 10 },
+    ])).not.toBeNull();
+  });
+});
+
+describe('vocabulary guard — a real food is never rewritten', () => {
+  /**
+   * Each of these is a pair of DIFFERENT real foods that sit within typo
+   * distance of each other. Every one silently logged the wrong food before
+   * the vocabulary guard.
+   */
+  it.each([
+    ['beef', 'beer'], ['pear', 'peas'], ['corn', 'cord'], ['ham', 'jam'],
+    ['tea', 'pea'], ['cake', 'kale'], ['soda', 'soup'], ['lime', 'lima'],
+    ['chicken', 'chicken soup'], ['egg', 'eggplant'], ['apple', 'pineapple'],
+    ['milk', 'milkshake'], ['rice', 'ripe'],
+  ])('typing %j never resolves to a stored %j', (query, stored) => {
+    expect(findBestMatch(query, [
+      { id: stored, aliases: [stored], timesLogged: 50 },
+    ])).toBeNull();
+  });
+
+  it('still corrects words that are not foods at all', () => {
+    for (const [typo, food] of [
+      ['bananna', 'banana'], ['chiken', 'chicken'], ['chikcen', 'chicken'],
+      ['brocoli', 'broccoli'], ['yoghrt', 'yoghurt'],
+    ]) {
+      expect(findBestMatch(typo, [{ id: food, aliases: [food], timesLogged: 10 }]), typo)
+        .not.toBeNull();
+    }
+  });
+
+  it('still corrects a typo inside a multi-word name', () => {
+    expect(findBestMatch('britannia bred', [
+      { id: 'b', aliases: ['britannia bread'], timesLogged: 10 },
+    ])).not.toBeNull();
+  });
+});
