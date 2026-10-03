@@ -1,8 +1,14 @@
 {
-  "buildCommand": "npm run build --prefix frontend",
-  "installCommand": "npm install --prefix frontend",
+  "installCommand": "npm install --legacy-peer-deps && npm install --prefix frontend",
+  "buildCommand": "npx prisma generate && npm run build --prefix frontend",
   "outputDirectory": "frontend/dist",
+  "functions": {
+    "api/index.ts": {
+      "maxDuration": 30
+    }
+  },
   "rewrites": [
+    { "source": "/api/:path*", "destination": "/api/index?__route=:path*" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }

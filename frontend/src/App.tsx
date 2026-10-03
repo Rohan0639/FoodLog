@@ -5,9 +5,8 @@ import Dashboard from './pages/Dashboard';
 import { runLegacyMigration } from './lib/migration/legacyMigration';
 import { isStorageAvailable } from './lib/storage/localDb';
 import { hasVault, isUnlocked } from './lib/security/vault';
-import * as syncService from './lib/sync/syncService';
 import { profileService } from './lib/services';
-import { VaultGate, SignInGate } from './components/AccessGate';
+import { VaultGate, AccountGate } from './components/AccessGate';
 import { Blobs, Card } from './ui/primitives';
 import { spring } from './ui/motion';
 
@@ -15,7 +14,7 @@ import { spring } from './ui/motion';
  * Startup order, each step gating the next:
  *   1. storage must work
  *   2. the diary must be unlocked with the user's passphrase (created on first use)
- *   3. the user must be signed in with Google, when sync is configured
+ *   3. the user must be signed in to their FoodLog account
  *   4. the one-time Supabase import runs, then the dashboard opens
  */
 type Phase = 'blocked' | 'setup' | 'unlock' | 'account' | 'booting' | 'ready';
@@ -29,10 +28,7 @@ function initialPhase(): Phase {
 export default function App() {
   const [phase, setPhase] = useState<Phase>(initialPhase);
 
-  const afterVault = useCallback(() => {
-    setPhase(syncService.isConfigured() ? 'account' : 'booting');
-  }, []);
-
+  const afterVault = useCallback(() => setPhase('account'), []);
   const afterAccount = useCallback(() => setPhase('booting'), []);
 
   useEffect(() => {
@@ -82,7 +78,7 @@ export default function App() {
     return (
       <>
         <Blobs />
-        <SignInGate onSignedIn={afterAccount} />
+        <AccountGate onSignedIn={afterAccount} />
       </>
     );
   }

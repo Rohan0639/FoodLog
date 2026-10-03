@@ -41,3 +41,6 @@ backend/.env.*.local
 
 
 
+
+# Generated Prisma client
+server/generated/

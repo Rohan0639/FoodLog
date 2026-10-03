@@ -1,0 +1,138 @@
+// FoodLog — server-side schema (Phase B design).
+//
+// Only account and diary data that must be shared across requests lives here.
+// The on-device encrypted store remains the offline cache and is not mirrored.
+// Foods learned on device (FoodDictionary) stay local and are not stored here.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../server/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum FoodSource {
+  AI
+  LABEL
+  USER
+  DICTIONARY
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique @db.VarChar(255)
+  name         String   @db.VarChar(100)
+  passwordHash String   @db.VarChar(255)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  foodLogs   FoodLog[]
+  goal       DailyGoal?
+  favorites  FavoriteFood[]
+  foods      FoodDictionaryEntry[]
+}
+
+/// One diary day for one user. The local date (YYYY-MM-DD) is the bucket.
+model FoodLog {
+  id        String   @id @default(cuid())
+  userId    String
+  date      DateTime @db.Date
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items FoodItem[]
+
+  @@unique([userId, date])
+  @@index([userId])
+}
+
+model FoodItem {
+  id        String     @id @default(cuid())
+  foodLogId String
+  name      String     @db.VarChar(200)
+  quantity  Float
+  unit      String     @db.VarChar(20)
+  calories  Float
+  protein   Float
+  carbs     Float
+  fat       Float
+  sugar     Float      @default(0)
+  fiber     Float      @default(0)
+  source    FoodSource @default(AI)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  foodLog FoodLog @relation(fields: [foodLogId], references: [id], onDelete: Cascade)
+
+  @@index([foodLogId])
+}
+
+model DailyGoal {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  calories  Int      @default(2000)
+  protein   Int      @default(135)
+  carbs     Int      @default(230)
+  fat       Int      @default(70)
+  sugar     Int      @default(50)
+  fiber     Int      @default(30)
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model FavoriteFood {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String   @db.VarChar(200)
+  quantity  Float
+  unit      String   @db.VarChar(20)
+  calories  Float
+  protein   Float
+  carbs     Float
+  fat       Float
+  sugar     Float    @default(0)
+  fiber     Float    @default(0)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+enum MacroSource {
+  AI
+  LABEL
+  USER
+}
+
+/// Foods this user has logged before, so repeat entries skip the Gemini call.
+/// `key` is the normalised food name (singular, sorted tokens) used for lookup.
+/// Macros are stored per one `baseUnit`, so any quantity can be rescaled later.
+model FoodDictionaryEntry {
+  id              String      @id @default(cuid())
+  userId          String
+  key             String      @db.VarChar(200)
+  name            String      @db.VarChar(200)
+  baseUnit        String      @db.VarChar(20)
+  caloriesPerUnit Float
+  proteinPerUnit  Float
+  carbsPerUnit    Float
+  fatPerUnit      Float
+  sugarPerUnit    Float       @default(0)
+  fiberPerUnit    Float       @default(0)
+  source          MacroSource @default(AI)
+  timesLogged     Int         @default(1)
+  lastUsedAt      DateTime    @default(now())
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key])
+  @@index([userId, lastUsedAt])
+}

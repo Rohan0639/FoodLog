@@ -1,49 +1,44 @@
 # 🍳 FoodLog
 
 A conversational food diary. Instead of searching a database and picking from
-five near-identical entries for a single apple, you just type what you ate:
+five near-identical entries for a single apple, you type what you ate:
 
 > *"I had 2 fried eggs, a slice of whole wheat toast, and 200ml orange juice."*
 
 FoodLog splits that into items, estimates calories and macronutrients, lets you
-adjust the portions, and logs them. It is **local-first**: your diary lives in
-your browser, there are no accounts, and nothing you log is stored on a server.
+adjust the portions, and logs them.
+
+**Live app:** https://foodlog-cyan.vercel.app
 
 ---
 
 ## Features
 
-- **Private by design** — your diary is encrypted on your device with a
-  passphrase only you know. Sign in with Google to keep an encrypted copy in
-  your own Drive.
+- **Accounts** — register and sign in with email and password. Passwords are
+  hashed with Argon2id, and the session lives in an httpOnly cookie.
 - **Natural-language logging** — type a meal the way you'd text a friend. Items
-  are separated on `and`, `,` and `+` (never `with`, so *"burger with cheese"*
-  stays one dish).
-- **Nutrition label photos** — attach a photo of a packaged food's nutrition
-  panel. Its printed figures are used instead of an estimate, scaled to the
-  amount you actually ate.
-- **Review before you log** — every parsed item appears in an editable table.
-  Adjust quantities and units; macros recalculate live. Nothing is saved until
-  you confirm.
-- **Learns your foods** — every confirmed item teaches a personal food
-  dictionary, so the next time you type *"2 eggs"* it resolves instantly, on
-  your device, with no network call. Mistyped foods you correct are remembered
-  too.
-- **Daily dashboard** — calorie ring, macro progress bars against your goals,
-  streak counter, and today's itemised list with inline edit and delete.
-- **History** — a monthly calendar with logged-day markers, a 7-day calorie
-  chart, weekly average, and a per-day breakdown.
-- **Goals and preferences** — editable daily targets (calories, protein, carbs,
-  fat, sugar, fiber), confetti on/off, and history chart length.
-- **Encrypted backup and restore** — export your whole diary to a file sealed
-  with a passphrase you choose, and restore it later, on this or another device.
-  A reminder appears once you have enough data and haven't backed up recently.
-- **Optional Google Drive sync** — keep one diary across all your devices, stored
-  in a private app-only folder in *your own* Google Drive. See
+  are split on `and`, `,` and `+` (never `with`, so *"burger with cheese"* stays
+  one dish).
+- **Saved foods** — every food you log is remembered on the server, per account.
+  Repeat foods are answered from your saved list, so Gemini is called only for
+  foods you haven't logged before.
+- **Nutrition label photos** — attach a photo of a packaged food's label. Its
+  printed figures are used instead of an estimate, scaled to what you ate.
+- **Review before you log** — each parsed item appears in an editable table.
+  Quantities and units can be changed, and macros recalculate live.
+- **Daily dashboard** — calorie ring, macro bars against your goals, streak
+  counter, and today's list with edit and delete.
+- **History** — monthly calendar with logged-day markers, a 7-day calorie chart,
+  weekly average, and a per-day breakdown.
+- **Goals and preferences** — editable daily targets, confetti on or off, and
+  history chart length.
+- **Encrypted on your device** — your diary is encrypted with a passphrase only
+  you know, before it is saved.
+- **Encrypted backup and restore** — export your diary to a file sealed with a
+  passphrase, and restore it later on this or another device.
+- **Optional Google Drive sync** — keep an encrypted copy of your diary in a
+  private app folder in your own Google Drive. See
   [docs/SYNC_SETUP.md](docs/SYNC_SETUP.md).
-- **Works offline for everything except new text parsing** — logging, editing,
-  history and stats are all local. Only phrases you have never logged before
-  need the AI service.
 - **Clear save feedback** — if a change cannot be saved on the device, a banner
   says so.
 
@@ -51,40 +46,53 @@ your browser, there are no accounts, and nothing you log is stored on a server.
 
 ## How it works
 
-Every meal description passes through a ladder of progressively more expensive
-steps. The cheap steps run first, so the AI is only called for food the app
-genuinely hasn't seen:
+Every meal passes through a ladder of steps, cheapest first:
 
 ```
- "2 eggs and a banana"
+ "2 eggs and toast"
         │
         ▼
- 1. Whole-phrase cache       ── this exact sentence was parsed before?  → done
-        │ miss
+ 1. Device dictionary     exact, partial or fuzzy match against foods on this device
+        │ anything left
         ▼
- 2. Personal food dictionary ── per fragment: exact alias → partial name → fuzzy typo match
-        │ fragments left over
+ 2. Server (POST /api/parse-food, login required)
+        ├─ 2a. Your saved foods in PostgreSQL     ── known food → answered, no AI call
+        ├─ 2b. Gemini for the remaining items     ── structured JSON
+        └─ 2c. Validation: macro maths (4P + 4C + 9F ≈ kcal), calorie density,
+               macro grams ≤ stated weight
+        │   new results are saved to your food list for next time
         ▼
- 3. Server parser (/api/parse-food)
-        ├─ rate limit + server cache
-        ├─ rule-based matcher (common staples, gram/piece maths)
-        └─ Gemini AI (structured JSON output)
-        │
-        ▼
- 4. Validator   ── checks macro maths (4P + 4C + 9F ≈ kcal), calorie density,
-                  and that macro grams don't exceed the stated weight
-        │
-        ▼
- 5. Review table → you confirm → saved locally → dictionary learns → Drive sync (if on)
+ 3. Review table → you confirm → saved on the device → dictionary learns
 ```
 
 Two design choices drive most of this:
 
-- **Trust is ranked.** A food's macros can come from an AI estimate, a
-  photographed label, or your own hand correction. Higher-trust sources are
-  never silently overwritten by lower ones.
-- **Deletions are facts.** Deleting an entry leaves a tombstone, so the entry
-  can't reappear from another device that hasn't synced yet.
+- **Trust is ranked.** A food's macros can come from an AI estimate, a label, or
+  your own correction. Higher-trust sources are never silently overwritten.
+- **Deletions are facts.** Deleting an entry leaves a record, so it can't
+  reappear from another device that hasn't synced yet.
+
+---
+
+## Architecture
+
+```
+            Browser (React, Vite)
+                  │  /api/* (same origin, session cookie)
+                  ▼
+        Vercel: api/index.ts  ──►  Express app (server/)
+                                     ├─ auth      register · login · logout · me
+                                     ├─ parsing   saved foods → Gemini → validation
+                                     └─ health    /api/health, /api/health/db
+                                          │
+                       ┌──────────────────┼──────────────────┐
+                       ▼                  ▼                  ▼
+               PostgreSQL (Supabase)   Google Gemini   (on device: encrypted diary,
+               schema foodlog_app                       dictionary, Drive sync)
+```
+
+The server stores accounts and saved foods. It does not store diary entries
+yet. Those stay encrypted on the device.
 
 ---
 
@@ -92,13 +100,15 @@ Two design choices drive most of this:
 
 | Area | Tools |
 |---|---|
-| Frontend | React 19, TypeScript, Vite 8, Tailwind CSS 3, Framer Motion, Lucide icons, canvas-confetti |
-| Backend | Vercel serverless functions (`@vercel/node`), TypeScript |
-| AI | Google Gemini (`gemini-3.1-flash-lite`) for text parsing and label reading |
-| Storage | Browser `localStorage` (single versioned key) |
-| Sync | Google Identity Services (OAuth 2.0) + Google Drive REST API, `drive.appdata` scope |
-| Testing | Vitest |
-| Hosting | Vercel |
+| Frontend | React 19, TypeScript, Vite 8, Tailwind CSS 3, Framer Motion, Lucide, canvas-confetti |
+| Server | Node.js, Express 5, TypeScript, Zod validation |
+| Auth | Argon2id (password hashing), JWT in an httpOnly cookie |
+| Database | PostgreSQL on Supabase, accessed through Prisma 7 (`foodlog_app` schema) |
+| AI | Google Gemini (`gemini-3.1-flash-lite`), called only from the server |
+| On-device storage | Browser `localStorage`, encrypted with AES-256-GCM |
+| Sync (optional) | Google Identity Services (OAuth 2.0), Google Drive `appdata` scope |
+| Testing | Vitest, Supertest (server), Vitest (frontend logic) |
+| Hosting | Vercel (frontend and the `/api` function) |
 
 ---
 
@@ -107,34 +117,35 @@ Two design choices drive most of this:
 ```
 foodlog/
 ├── api/
-│   └── parse-food.ts            # POST /api/parse-food — the only server endpoint
-├── backend/
-│   ├── parsers/                 # Orchestrator + rule-based parser
-│   ├── services/                # Gemini client, label reader, in-memory cache
-│   └── utils/                   # Rate limiter, macro validator
-├── shared/                      # Types and text normalisation used by client and server
-├── config/                      # Gemini model name and endpoint
-├── scripts/                     # Browser-console diagnostics for local data and migration
-├── docs/                        # Google Drive sync setup guide and screenshots
-└── frontend/
-    ├── src/
-    │   ├── pages/Dashboard.tsx  # Main screen: chat + dashboard, parsing orchestration
-    │   ├── components/          # Chat, review table, dashboard, history, settings, sync UI
-    │   ├── hooks/               # Reactive data hooks and background auto-sync
-    │   ├── lib/
-    │   │   ├── storage/         # The one module that touches localStorage, and the schema
-    │   │   ├── services/        # Data API: logs, dictionary, stats, chat, goals, backup…
-    │   │   ├── nlp/             # Normalisation, fuzzy matching, food vocabulary
-    │   │   ├── parsing/         # Offline parsing ladder
-    │   │   ├── sync/            # Drive OAuth, API client, merge and tombstones
-    │   │   └── migration/       # One-time importer for the older Supabase-based version
-    │   ├── ui/                  # Design-system primitives and animation presets
-    │   └── utils/               # Unit conversion, dates, image preparation
-    └── tests/                   # Vitest suite
+│   └── index.ts                 # Vercel entry: every /api/* request goes to the Express app
+├── server/
+│   ├── src/
+│   │   ├── app.ts               # Express app: middleware, routes, error handling
+│   │   ├── server.ts            # Local server entry (npm run server:start)
+│   │   ├── config/env.ts        # Validated environment variables
+│   │   ├── db/client.ts         # Prisma client (PostgreSQL adapter)
+│   │   ├── middleware/          # Session check, error envelope
+│   │   ├── modules/
+│   │   │   ├── auth/            # Registration, login, sessions
+│   │   │   └── parsing/         # Saved-food lookup, Gemini parser, label route
+│   │   └── utils/logger.ts      # JSON logs with secrets redacted
+│   └── tests/                   # Server tests (API, parsing, database)
+├── prisma/
+│   ├── schema.prisma            # Users, food logs, items, goals, favourites, food dictionary
+│   └── migrations/              # Applied to Supabase
+├── backend/                     # Existing parsing code: Gemini client, validator, label reader
+├── shared/                      # Types and text normalisation
+├── frontend/
+│   ├── src/
+│   │   ├── App.tsx              # Start-up: passphrase → account → dashboard
+│   │   ├── components/          # Gates, chat, review table, dashboard, history, settings
+│   │   ├── services/api/        # Typed client for the server (auth, errors)
+│   │   ├── lib/                 # Storage, encryption, parsing, sync, migration
+│   │   └── ...
+│   └── tests/                   # Frontend logic tests
+├── docs/                        # Setup guides and design notes
+└── vercel.json                  # Build, function and rewrite settings
 ```
-
-For a file-by-file walkthrough, see [FILE_GUIDE.md](FILE_GUIDE.md). For the
-architecture overview, see [PROJECT_DETAILS.md](PROJECT_DETAILS.md).
 
 ---
 
@@ -143,107 +154,146 @@ architecture overview, see [PROJECT_DETAILS.md](PROJECT_DETAILS.md).
 ### Prerequisites
 
 - Node.js 18 or newer
+- A PostgreSQL database. This project uses [Supabase](https://supabase.com/)
 - A Google Gemini API key from [Google AI Studio](https://aistudio.google.com/)
 
 ### 1. Install
 
 ```bash
-npm run install:all        # root dependencies + frontend dependencies
+npm install --legacy-peer-deps
+npm install --prefix frontend
 ```
 
-### 2. Configure environment variables
+### 2. Configure
 
-Copy the example file and add your key:
+Copy the example and fill in your values. **Never commit `.env`.**
 
 ```bash
 cp .env.example .env
 ```
 
-```bash
-# .env (repo root)
-GEMINI_API_KEY=your-google-gemini-api-key
-```
+| Variable | Where | What it is |
+|---|---|---|
+| `DATABASE_URL` | root `.env` | PostgreSQL connection string. For Supabase, use the **Session pooler** string and add `?schema=foodlog_app` |
+| `JWT_SECRET` | root `.env` | At least 32 random characters, used to sign login sessions |
+| `GEMINI_API_KEY` | root `.env` | Your Gemini key. Used only on the server |
+| `CORS_ORIGIN` | root `.env` | Frontend origin allowed to call the API (default `http://localhost:5173`) |
+| `PORT` | root `.env` | Local API port (default `8787`) |
+| `VITE_GOOGLE_CLIENT_ID` | `frontend/.env` | Only for Google Drive sync. See [docs/SYNC_SETUP.md](docs/SYNC_SETUP.md) |
 
-Google Drive sync is optional. To enable it, add `VITE_GOOGLE_CLIENT_ID` to
-`frontend/.env` — the full steps are in [docs/SYNC_SETUP.md](docs/SYNC_SETUP.md).
+Generate a `JWT_SECRET` with: `node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"`
 
-### 3. Run
-
-```bash
-npm run dev                # starts the Vite dev server at http://localhost:5173
-```
-
-The dev server also serves `/api/parse-food` by running the same handler
-in-process, so text parsing works locally without the Vercel CLI.
-
-Open the app, tap one of the suggestions, or type *"I had 2 eggs and toast"*.
-
-### Other commands
+### 3. Set up the database
 
 ```bash
-npm run build --prefix frontend      # type-check and produce a production build
-npm run preview --prefix frontend    # serve the production build locally
-npm run lint --prefix frontend       # ESLint
-npx vitest run --root frontend       # run the test suite
+npm run db:deploy        # applies the migrations to your database
 ```
+
+### 4. Run
+
+Two terminals, both from the project root:
+
+```bash
+npm run server:start     # API on http://localhost:8787
+npm run dev              # app on http://localhost:5173 (proxies /api to the API)
+```
+
+Open http://localhost:5173, set a passphrase, create an account, and log a meal.
 
 ---
 
-## Deployment
+## Scripts
 
-The project is set up for Vercel (`vercel.json`):
+| Command | What it does |
+|---|---|
+| `npm run server:start` | Start the API server |
+| `npm run server:dev` | Start the API server and reload on changes |
+| `npm run dev` | Start the frontend (port 5173) |
+| `npm run test:server` | Run the server tests (API, parsing, database) |
+| `npm run test:db` | Run only the database tests |
+| `npm run db:deploy` | Apply database migrations |
+| `npm run db:migrate` | Create and apply a new migration in development |
+| `npm run db:generate` | Regenerate the Prisma client |
+| `npm run build --prefix frontend` | Type-check and build the frontend |
+| `cd frontend && npx vitest run` | Run the frontend tests |
 
-- The frontend builds from `frontend/` into `frontend/dist`.
-- Everything under `api/` deploys as a serverless function.
-- Non-API routes rewrite to `index.html`, so client-side navigation works.
+Server tests use your real database and delete the rows they create. Point
+`DATABASE_URL` at a development project, not production data.
 
-Add `GEMINI_API_KEY` to the Vercel project's environment variables. For Drive
-sync, add `VITE_GOOGLE_CLIENT_ID` and register your deployed URL as an
-authorised origin in the Google Cloud console.
+---
+
+## Deployment (Vercel)
+
+The live site is deployed on Vercel. To deploy your own copy:
+
+1. Install the Vercel CLI and log in: `npx vercel login`
+2. Link the project: `npx vercel link`
+3. Add the server variables to production. Use the values from your `.env`:
+   ```bash
+   npx vercel env add DATABASE_URL production
+   npx vercel env add JWT_SECRET production
+   npx vercel env add GEMINI_API_KEY production
+   ```
+   Add `CORS_ORIGIN` as your deployed URL if you need it.
+4. Deploy: `npx vercel --prod --yes`
+
+`vercel.json` installs the server's dependencies, generates the Prisma client,
+builds the frontend, and sends every `/api/*` request to `api/index.ts`. Other
+paths fall back to `index.html`.
+
+To check a deployment: `/api/health` should return `{"success":true,...}`, and
+`/api/health/db` should return `"database":"ok"`.
 
 ---
 
 ## Privacy
 
-- **Encrypted on the device.** The diary is encrypted with AES-256-GCM. The key
-  is derived in your browser from a passphrase you choose (PBKDF2, 600,000
-  iterations). The passphrase is never stored or sent anywhere, and the key is
-  held only in memory, so you enter the passphrase again on each visit.
-- **Sign-in and sync use your own Google Drive.** When sync is configured, you
-  sign in with Google, and the encrypted diary is stored in a private app folder
-  in your Drive. The app's access is limited to that folder, and Google only
-  ever sees ciphertext.
-- **Backups are encrypted too.** Each backup has its own salt and is sealed with
-  a passphrase you enter at export. Restoring needs that passphrase.
-- **The server stores nothing.** The only data sent to the server is the text of
-  the meal being parsed (and a label photo, if you attach one). There are no
-  accounts on the server and no database.
-- **A forgotten passphrase cannot be recovered.** Nothing else holds a decryptable
-  copy, so keep your passphrases somewhere safe.
+What is stored where:
+
+| Data | Where | Readable by the server? |
+|---|---|---|
+| Diary entries (meals, quantities, macros, goals) | Your device, encrypted with your passphrase | No |
+| Dictionary of foods learned on the device | Your device | No |
+| Encrypted backups | Files you keep | No (encrypted with your backup passphrase) |
+| Drive sync copy (optional) | Your Google Drive app folder, encrypted | No |
+| Account: email, name, password hash | PostgreSQL | Yes (password stored only as an Argon2id hash) |
+| Saved foods: food names, per-unit macros, how often logged | PostgreSQL, per account | Yes |
+| Meal text sent for parsing, and label photos | Sent to the server and Gemini to be parsed | Yes, while processing |
+
+Notes:
+- Your passphrase is never stored or sent. A forgotten passphrase cannot be
+  recovered, so the on-device diary, its Drive copy, and any backup protected by
+  that passphrase become unreadable.
+- The server does not yet store diary entries, so logs are not on the server.
+  Moving them there would be a further change to the privacy model.
+
+---
 
 ## Limitations
 
-- **Data lives on one device until you sync or export.** Clearing site data
-  erases the local copy. Keep Drive sync on or export regular encrypted backups.
-- **Passphrase recovery is not possible.** A lost passphrase makes the local
-  copy, the Drive copy, and any backup unreadable.
-- **Server rate limiting is per instance.** It guards against casual abuse, not
-  a determined attacker. A distributed limiter would be the next step for
-  production use.
-- **Estimates are estimates.** AI-parsed macros are approximate. Labels and
-  hand corrections are more reliable, and the app ranks them that way.
-- **localStorage is roughly 5 MB.** Very long histories will eventually need
-  pruning or a move to IndexedDB.
+- **Diary entries live on one device** until you sync or export. Clearing site
+  data erases the local copy.
+- **Passphrase recovery is not possible.**
+- **Cold starts.** The API runs as a serverless function, so the first request
+  after a quiet period is slower.
+- **Rate limiting is per instance.** It guards against casual abuse, not a
+  determined attacker. A shared limiter is needed for production scale.
+- **Estimates are estimates.** AI-parsed macros are approximate. Labels and hand
+  corrections are more reliable, and the app ranks them that way.
+- **Not yet on the server:** diary logs, goals and favourites. Login-protected
+  routes for these are planned.
+- **Not yet verified:** the label-photo path on the live site, and the full
+  browser walkthrough.
 
 ---
 
 ## Roadmap
 
+- Diary logs, goals and favourites on the server
+- Swagger/OpenAPI documentation
+- CI: run tests on every pull request
 - Barcode scanning
 - Weekly macro goal cycling (refeed and deficit days)
-- CSV and PDF reports
-- Installable PWA and home-screen widget
-- Favourites UI (the data layer already exists)
 - Recovery codes for lost passphrases
 - Move local storage to IndexedDB for larger histories
 
@@ -251,6 +301,7 @@ authorised origin in the Google Cloud console.
 
 ## Status
 
-Core logging, label scanning, the offline parsing ladder, history, backup, and
-Drive sync are implemented. The app is a personal project and has not been
-audited for production use.
+The core features work end to end: accounts, passphrase protection, food logging
+through the server with saved-food reuse, label photos, history, backup, and
+optional Drive sync. The app is a personal project and has not been audited for
+production use.

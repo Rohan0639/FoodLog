@@ -1,4 +1,5 @@
 import type { GeminiResponse } from '../types';
+import { apiRequest } from '../services/api/client';
 
 /** A nutrition label photographed alongside the message. */
 export interface AttachedImage {
@@ -12,32 +13,18 @@ export interface ServerParseResult extends GeminiResponse {
 }
 
 /**
- * Sends a meal description to the parser, optionally with a nutrition label.
- *
- * The image is additional evidence on the ordinary logging path — there is no
- * separate scanning workflow. Without one, this behaves exactly as it always
- * has.
+ * Sends a meal description to the authenticated parser, optionally with a
+ * nutrition label. The server answers from the user's saved foods first and only
+ * calls the AI for what is new.
  */
-export async function analyzeFoodServer(
+export function analyzeFoodServer(
   foodText: string,
   image?: AttachedImage
 ): Promise<ServerParseResult> {
-  const response = await fetch('/api/parse-food', {
+  return apiRequest<ServerParseResult>('/api/parse-food', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(
-      image
-        ? { text: foodText, image: image.base64, mimeType: image.mimeType }
-        : { text: foodText }
-    )
+    body: image
+      ? { text: foodText, image: image.base64, mimeType: image.mimeType }
+      : { text: foodText },
   });
-
-  if (!response.ok) {
-    const errorBody = await response.json().catch(() => ({}));
-    throw new Error(errorBody.message || errorBody.error || `Server returned status: ${response.status}`);
-  }
-
-  return response.json();
 }
