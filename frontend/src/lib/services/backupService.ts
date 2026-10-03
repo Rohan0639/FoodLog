@@ -10,6 +10,7 @@
 
 import { exportDb, importDb, readDb } from '../storage/localDb';
 import { addDays, getCurrentIsoString, getLocalIsoDate } from '../../utils/date';
+import { isBackupEnvelope, openBackup, sealBackup } from '../security/backup';
 import { updateSettings } from './settingsService';
 
 export interface BackupSummary {
@@ -88,14 +89,41 @@ export function assessRisk(): BackupRisk {
   return { atRisk: enoughToLose && stale && !snoozed, daysSinceBackup, entries };
 }
 
+/** True when a backup file is passphrase-encrypted rather than plain JSON. */
+export function isEncryptedBackup(serialized: string): boolean {
+  try {
+    return isBackupEnvelope(JSON.parse(serialized));
+  } catch {
+    return false;
+  }
+}
+
 /**
- * Triggers a download of the whole database.
+ * Returns the plain diary JSON from a backup file, decrypting it if needed.
+ * Plain backups from before encryption existed are accepted unchanged.
+ */
+export async function readBackup(serialized: string, passphrase?: string): Promise<string> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(serialized);
+  } catch {
+    throw new InvalidBackupError("That file isn't valid JSON.");
+  }
+
+  if (!isBackupEnvelope(parsed)) return serialized;
+  if (!passphrase) throw new InvalidBackupError('This backup is encrypted. Enter its passphrase.');
+  return openBackup(parsed, passphrase);
+}
+
+/**
+ * Triggers a download of the whole diary, encrypted with a passphrase.
  *
  * Uses an object URL rather than a data URI so large stores don't hit the
  * browser's URL length ceiling.
  */
-export function downloadBackup(): void {
-  const blob = new Blob([serialize()], { type: 'application/json' });
+export async function downloadBackup(passphrase: string): Promise<void> {
+  const envelope = await sealBackup(serialize(), passphrase);
+  const blob = new Blob([JSON.stringify(envelope)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
 
   const anchor = document.createElement('a');

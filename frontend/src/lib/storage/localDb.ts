@@ -1,14 +1,13 @@
 /**
- * The only module in the project permitted to touch `localStorage`.
+ * The only module in the project permitted to touch `localStorage` for the diary.
  *
  * Everything above this file (services, hooks, components) works with plain
- * objects and never sees a storage key, a JSON string, or a quota error. That
- * boundary is what makes the storage engine swappable later — moving to
- * IndexedDB would mean rewriting this file and nothing else.
+ * objects and never sees a storage key, a JSON string, or ciphertext.
  *
- * Reads are served from an in-memory snapshot, so the hot paths (history,
- * calendar, stats) never re-parse JSON. The snapshot is invalidated on write
- * and by `storage` events from other tabs.
+ * Once a vault exists, the diary is written to storage encrypted with the vault
+ * key, and writes are refused while the vault is locked. The in-memory copy is
+ * the authoritative view, so reads stay synchronous. Persistence to storage is
+ * queued, and its failures are reported through `getPersistError()`.
  */
 
 import {
@@ -18,6 +17,7 @@ import {
   normalizeDb,
   type FoodLogDb,
 } from './schema';
+import { hasVault, isEnvelope, isUnlocked, openJson, sealJson } from '../security/vault';
 
 export class StorageUnavailableError extends Error {
   readonly reason?: unknown;
@@ -41,9 +41,13 @@ export class StorageQuotaError extends Error {
 
 type Listener = () => void;
 
-let snapshot: FoodLogDb | null = null;
+/** The authoritative in-memory copy. `null` means it must be reloaded. */
+let current: FoodLogDb | null = null;
 let revision = 0;
 const listeners = new Set<Listener>();
+/** Writes are persisted one at a time, in order, because sealing is asynchronous. */
+let persistChain: Promise<void> = Promise.resolve();
+let persistError: string | null = null;
 
 /** True when localStorage can actually be read AND written (Safari private mode). */
 export function isStorageAvailable(): boolean {
@@ -57,6 +61,21 @@ export function isStorageAvailable(): boolean {
   }
 }
 
+/** True when the diary is protected by a vault this session has not unlocked. */
+export function isLocked(): boolean {
+  return hasVault() && !isUnlocked();
+}
+
+/** Resolves once every queued save has reached storage. */
+export function flushPersist(): Promise<void> {
+  return persistChain;
+}
+
+/** The most recent persistence failure, or null once a later save succeeds. */
+export function getPersistError(): string | null {
+  return persistError;
+}
+
 function notify(): void {
   revision++;
   listeners.forEach((listener) => {
@@ -68,10 +87,18 @@ function notify(): void {
   });
 }
 
+function readRaw(): string | null {
+  try {
+    return window.localStorage.getItem(DB_KEY);
+  } catch (err) {
+    console.error('[localDb] localStorage is not readable', err);
+    return null;
+  }
+}
+
 /**
  * Parks an unparseable payload under a timestamped key rather than discarding
- * it, then starts fresh. A corrupt store must never be silently deleted — the
- * bytes may still be recoverable by hand.
+ * it, then starts fresh. A corrupt store must never be silently deleted.
  */
 function quarantineCorruptPayload(raw: string): void {
   try {
@@ -85,60 +112,124 @@ function quarantineCorruptPayload(raw: string): void {
   }
 }
 
-/** Reads the whole database. Cheap after the first call. */
-export function readDb(): FoodLogDb {
-  if (snapshot) return snapshot;
-
-  let raw: string | null;
-  try {
-    raw = window.localStorage.getItem(DB_KEY);
-  } catch (err) {
-    console.error('[localDb] localStorage is not readable', err);
-    snapshot = createEmptyDb();
-    return snapshot;
-  }
+/**
+ * Loads the diary from storage into memory. Call once after the vault is unlocked.
+ *
+ * A plaintext store from before encryption existed is adopted and re-saved
+ * encrypted, so the upgrade happens on the user's first unlock.
+ */
+export async function loadStoredDb(): Promise<FoodLogDb> {
+  const raw = readRaw();
 
   if (!raw) {
-    snapshot = createEmptyDb();
-    return snapshot;
+    current = createEmptyDb();
+    notify();
+    return current;
   }
 
+  let parsed: unknown;
   try {
-    snapshot = normalizeDb(JSON.parse(raw));
+    parsed = JSON.parse(raw);
   } catch (err) {
     quarantineCorruptPayload(raw);
     console.error('[localDb] JSON parse failed', err);
-    snapshot = createEmptyDb();
+    current = createEmptyDb();
+    notify();
+    return current;
   }
-  return snapshot;
+
+  if (isEnvelope(parsed)) {
+    current = normalizeDb(await openJson(parsed));
+    notify();
+    return current;
+  }
+
+  current = normalizeDb(parsed);
+  persist(current);
+  notify();
+  return current;
 }
 
-/** Persists a complete database object and notifies subscribers. */
+/** Re-reads an encrypted store in the background, after a change from another tab. */
+function refreshInBackground(): void {
+  void loadStoredDb().catch((err) => {
+    console.error('[localDb] could not refresh from storage', err);
+  });
+}
+
+/** Reads the whole database. Cheap after the first call. */
+export function readDb(): FoodLogDb {
+  if (current) return current;
+
+  // Locked: show nothing, and do not cache, so a later unlock is picked up.
+  if (isLocked()) return createEmptyDb();
+
+  const raw = readRaw();
+  if (!raw) {
+    current = createEmptyDb();
+    return current;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    quarantineCorruptPayload(raw);
+    console.error('[localDb] JSON parse failed', err);
+    current = createEmptyDb();
+    return current;
+  }
+
+  // Encrypted, and the key is held: decrypt asynchronously and return empty for now.
+  if (isEnvelope(parsed)) {
+    refreshInBackground();
+    return createEmptyDb();
+  }
+
+  current = normalizeDb(parsed);
+  return current;
+}
+
+/** Queues a save. Sealed with the vault key whenever one exists. */
+function persist(db: FoodLogDb): void {
+  persistChain = persistChain.then(async () => {
+    const before = persistError;
+    try {
+      const payload = isUnlocked() ? await sealJson(db) : db;
+      window.localStorage.setItem(DB_KEY, JSON.stringify(payload));
+      persistError = null;
+    } catch (err) {
+      const isQuota =
+        err instanceof DOMException &&
+        (err.name === 'QuotaExceededError' || err.name === 'NS_ERROR_DOM_QUOTA_REACHED');
+      persistError = isQuota
+        ? 'This browser is out of local storage space. Export your data, then delete some old logs.'
+        : 'Your latest changes could not be saved on this device.';
+      console.error('[localDb] persist failed', err);
+    }
+    // Only announce a change of state, so healthy saves do not re-render the app.
+    if (before !== persistError) notify();
+  });
+}
+
+/**
+ * Replaces the in-memory database and queues it for saving.
+ *
+ * Refuses to run while the vault is locked, so a locked store can never be
+ * overwritten with an empty one.
+ */
 export function writeDb(next: FoodLogDb): FoodLogDb {
+  if (isLocked()) {
+    throw new StorageUnavailableError('Unlock your diary before changing it.');
+  }
+
   const stamped: FoodLogDb = {
     ...next,
     meta: { ...next.meta, updatedAt: new Date().toISOString() },
   };
 
-  try {
-    window.localStorage.setItem(DB_KEY, JSON.stringify(stamped));
-  } catch (err) {
-    const isQuota =
-      err instanceof DOMException &&
-      (err.name === 'QuotaExceededError' || err.name === 'NS_ERROR_DOM_QUOTA_REACHED');
-    if (isQuota) {
-      throw new StorageQuotaError(
-        'This browser is out of local storage space. Delete some old logs or export your data.',
-        err
-      );
-    }
-    throw new StorageUnavailableError(
-      'This browser is blocking local storage, so your changes could not be saved.',
-      err
-    );
-  }
-
-  snapshot = stamped;
+  current = stamped;
+  persist(stamped);
   notify();
   return stamped;
 }
@@ -146,7 +237,7 @@ export function writeDb(next: FoodLogDb): FoodLogDb {
 /**
  * Read-modify-write in one step. The single mutation primitive: every service
  * writes through this, so there is exactly one place where persistence,
- * snapshot invalidation and change notification happen.
+ * cache invalidation and change notification happen.
  */
 export function updateDb(mutate: (db: FoodLogDb) => FoodLogDb): FoodLogDb {
   return writeDb(mutate(readDb()));
@@ -163,13 +254,17 @@ export function getRevision(): number {
   return revision;
 }
 
-/** Drops the cached snapshot so the next read hits localStorage again. */
+/** Drops the in-memory copy so the next read reloads it. */
 export function invalidate(): void {
-  snapshot = null;
+  current = null;
   notify();
 }
 
-/** Serialised copy of the database, for a future export/backup feature. */
+/**
+ * Serialised copy of the database, for export.
+ *
+ * Note: exports are plain JSON, so an exported file is not encrypted.
+ */
 export function exportDb(): string {
   return JSON.stringify(readDb(), null, 2);
 }
@@ -180,11 +275,11 @@ export function importDb(serialized: string): FoodLogDb {
 }
 
 // Keep every open tab consistent: another tab writing the store invalidates
-// this one's snapshot so the next read picks up their changes.
+// this one's copy so the next read picks up their changes.
 if (typeof window !== 'undefined') {
   window.addEventListener('storage', (event) => {
     if (event.key === DB_KEY || event.key === null) {
-      snapshot = null;
+      current = null;
       notify();
     }
   });

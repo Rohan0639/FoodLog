@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { resetStore } from './setup';
 import { mergeIntoDb, toPayload, isValidPayload, type SyncPayload } from '../src/lib/sync/merge';
 import * as tombstoneStore from '../src/lib/sync/tombstones';
-import { readDb, invalidate } from '../src/lib/storage/localDb';
+import { readDb, invalidate, flushPersist } from '../src/lib/storage/localDb';
 import { createEmptyDb, normalizeDb, type FoodLogRecord } from '../src/lib/storage/schema';
 import * as logService from '../src/lib/services/logService';
 import * as dictionaryService from '../src/lib/services/dictionaryService';
@@ -23,7 +23,8 @@ const emptyPayload = (over: Partial<SyncPayload> = {}): SyncPayload => ({
   ...over,
 });
 
-beforeEach(() => {
+beforeEach(async () => {
+  await flushPersist();
   resetStore();
   invalidate();
 });

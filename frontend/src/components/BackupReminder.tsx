@@ -15,7 +15,10 @@ import { spring } from '../ui/motion';
  * Deliberately restrained: silent until ~15 entries and ~3 weeks without a
  * backup, and dismissing it buys a real week of quiet.
  */
-export const BackupReminder: React.FC<{ onDismissed: () => void }> = ({ onDismissed }) => {
+export const BackupReminder: React.FC<{
+  onDismissed: () => void;
+  onOpenBackup: () => void;
+}> = ({ onDismissed, onOpenBackup }) => {
   const [risk] = React.useState(() => backupService.assessRisk());
   const [gone, setGone] = React.useState(false);
 
@@ -27,14 +30,11 @@ export const BackupReminder: React.FC<{ onDismissed: () => void }> = ({ onDismis
     onDismissed();
   };
 
+  // A backup needs a passphrase, so the reminder hands off to Settings, where it is entered.
   const backup = () => {
-    try {
-      backupService.downloadBackup();
-    } catch (err) {
-      console.error('[backup] export failed', err);
-    }
     setGone(true);
     onDismissed();
+    onOpenBackup();
   };
 
   return (

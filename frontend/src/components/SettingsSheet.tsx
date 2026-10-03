@@ -55,16 +55,44 @@ export const SettingsSheet: React.FC<SettingsSheetProps> = ({
   const [pendingRestore, setPendingRestore] = useState<
     { serialized: string; summary: BackupSummary } | null
   >(null);
+  /** The passphrase used to seal the next export. Never stored. */
+  const [backupPassphrase, setBackupPassphrase] = useState('');
+  /** An encrypted file waiting for its passphrase before it can be read. */
+  const [encryptedRestore, setEncryptedRestore] = useState<string | null>(null);
+  const [restorePassphrase, setRestorePassphrase] = useState('');
+  const [backupBusy, setBackupBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleExport = () => {
+  const handleExport = async () => {
+    setBackupBusy(true);
+    setRestoreError(null);
     try {
-      backupService.downloadBackup();
+      await backupService.downloadBackup(backupPassphrase);
+      setBackupPassphrase('');
       setExported(true);
       setTimeout(() => setExported(false), 2000);
     } catch (err) {
       console.error('[backup] export failed', err);
-      setRestoreError('Export failed — your browser blocked the download.');
+      setRestoreError(err instanceof Error ? err.message : 'Export failed.');
+    } finally {
+      setBackupBusy(false);
+    }
+  };
+
+  /** Opens an encrypted backup with the passphrase the user typed, then shows its summary. */
+  const openEncryptedRestore = async () => {
+    if (!encryptedRestore) return;
+    setBackupBusy(true);
+    setRestoreError(null);
+    try {
+      const plain = await backupService.readBackup(encryptedRestore, restorePassphrase);
+      setPendingRestore({ serialized: plain, summary: backupService.inspect(plain) });
+      setEncryptedRestore(null);
+      setRestorePassphrase('');
+    } catch (err) {
+      setRestoreError(err instanceof Error ? err.message : 'That backup could not be opened.');
+    } finally {
+      setBackupBusy(false);
     }
   };
 
@@ -78,6 +106,11 @@ export const SettingsSheet: React.FC<SettingsSheetProps> = ({
     setRestoreError(null);
     try {
       const serialized = await backupService.readFile(file);
+      if (backupService.isEncryptedBackup(serialized)) {
+        // Asked for before anything is read, so the contents are never shown unopened.
+        setEncryptedRestore(serialized);
+        return;
+      }
       setPendingRestore({ serialized, summary: backupService.inspect(serialized) });
     } catch (err) {
       setRestoreError(err instanceof Error ? err.message : 'That file could not be read.');
@@ -274,10 +307,53 @@ export const SettingsSheet: React.FC<SettingsSheetProps> = ({
               )}
             </p>
 
+            <input
+              type="password"
+              autoComplete="new-password"
+              value={backupPassphrase}
+              onChange={(e) => setBackupPassphrase(e.target.value)}
+              placeholder="Backup passphrase (8+ characters)"
+              aria-label="Backup passphrase"
+              className="field-sm w-full text-xs"
+            />
+
+            {encryptedRestore && (
+              <div className="space-y-2">
+                <p className="text-[11px] font-bold text-fg-muted leading-relaxed">
+                  This backup is encrypted. Enter the passphrase it was saved with.
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="password"
+                    autoComplete="off"
+                    value={restorePassphrase}
+                    onChange={(e) => setRestorePassphrase(e.target.value)}
+                    placeholder="Backup passphrase"
+                    aria-label="Backup passphrase to open"
+                    className="field-sm flex-1 min-w-0 text-xs"
+                  />
+                  <Button
+                    variant="soft"
+                    size="sm"
+                    onClick={openEncryptedRestore}
+                    disabled={backupBusy || !restorePassphrase}
+                  >
+                    Open
+                  </Button>
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-2">
-              <Button variant="soft" size="sm" fullWidth onClick={handleExport}>
+              <Button
+                variant="soft"
+                size="sm"
+                fullWidth
+                onClick={handleExport}
+                disabled={backupBusy || backupPassphrase.length < 8}
+              >
                 <Download className="w-3.5 h-3.5" />
-                {exported ? 'Saved!' : 'Export'}
+                {exported ? 'Saved!' : backupBusy ? 'Encrypting…' : 'Export'}
               </Button>
               <Button variant="soft" size="sm" fullWidth onClick={() => fileInputRef.current?.click()}>
                 <Upload className="w-3.5 h-3.5" />
@@ -301,8 +377,8 @@ export const SettingsSheet: React.FC<SettingsSheetProps> = ({
             )}
 
             <p className="text-[10px] font-bold text-fg-faint leading-relaxed">
-              Export writes a JSON file you can keep anywhere. Restoring replaces
-              everything currently on this device.
+              Export writes an encrypted file. Keep the passphrase somewhere safe: without
+              it the backup cannot be opened. Restoring replaces everything on this device.
             </p>
           </div>
         </motion.div>

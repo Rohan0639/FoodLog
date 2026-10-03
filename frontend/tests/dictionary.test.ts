@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { resetStore } from './setup';
 import * as dictionaryService from '../src/lib/services/dictionaryService';
 import * as localParser from '../src/lib/parsing/localParser';
-import { invalidate } from '../src/lib/storage/localDb';
+import { invalidate, flushPersist } from '../src/lib/storage/localDb';
 import { getLocalIsoDate } from '../src/utils/date';
 import type { FoodEntry } from '../src/types';
 
@@ -22,7 +22,8 @@ const teach = (name: string, times: number, perUnitCals = 70, unit = 'piece') =>
   }
 };
 
-beforeEach(() => {
+beforeEach(async () => {
+  await flushPersist();
   resetStore();
   invalidate();
 });

@@ -18,6 +18,7 @@ import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { useDbRevision } from '../hooks/useDbRevision';
 import { useAutoSync } from '../hooks/useAutoSync';
 import Navbar from '../components/Navbar';
+import { SaveStatus } from '../components/SaveStatus';
 import FoodLogger from '../components/FoodLogger';
 import { NutritionDashboard } from '../components/NutritionDashboard';
 import { Blobs, ConfirmDialog } from '../ui/primitives';
@@ -505,6 +506,7 @@ export default function Dashboard() {
       <Blobs />
 
       <Navbar isOnline={isOnline} onOpenSettings={() => setSettingsOpen(true)} />
+      <SaveStatus />
 
       <div className="flex-1 flex flex-row overflow-hidden relative min-h-0">
         {/* Chat / Log screen — always visible on desktop; on mobile only when 'log' tab is active */}
@@ -538,6 +540,7 @@ export default function Dashboard() {
             onDeleteFoodLog={handleDeleteFoodEntry}
             onUpdateFoodLog={handleUpdateFoodEntry}
             onClearAll={handleClearAll}
+            onOpenBackup={() => setSettingsOpen(true)}
           />
         </div>
       </div>
