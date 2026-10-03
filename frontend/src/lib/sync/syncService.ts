@@ -15,6 +15,7 @@ import { readDb, updateDb } from '../storage/localDb';
 import type { SyncState } from '../storage/schema';
 import { getCurrentIsoString } from '../../utils/date';
 import { isValidPayload, mergeIntoDb, toPayload, type MergeStats } from './merge';
+import { isEnvelope, openJson, sealJson } from '../security/vault';
 import * as auth from './googleAuth';
 import * as drive from './driveClient';
 
@@ -124,7 +125,12 @@ async function run(): Promise<SyncResult> {
     let stats: MergeStats | null = null;
 
     if (file) {
-      const remote = await drive.download(token, file.id);
+      const downloaded = await drive.download(token, file.id);
+      // The file is encrypted with the user's vault key; plaintext files from
+      // before encryption are still accepted so they can be pulled and re-saved.
+      const remote = downloaded !== null && isEnvelope(downloaded)
+        ? await openJson(downloaded)
+        : downloaded;
 
       if (remote !== null && isValidPayload(remote)) {
         const merged = mergeIntoDb(readDb(), remote);
@@ -138,12 +144,13 @@ async function run(): Promise<SyncResult> {
       }
     }
 
-    // 3. PUSH the merged result, which is a superset of both sides.
-    const payload = toPayload(readDb());
+    // 3. PUSH the merged result, which is a superset of both sides. Sealed, so
+    //    Google stores only ciphertext.
+    const content = await sealJson(toPayload(readDb()));
 
     file = file
-      ? await drive.update(token, file.id, payload)
-      : await drive.create(token, payload);
+      ? await drive.update(token, file.id, content)
+      : await drive.create(token, content);
 
     setState({
       fileId: file.id,

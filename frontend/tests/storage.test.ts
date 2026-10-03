@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { resetStore } from './setup';
-import { readDb, invalidate } from '../src/lib/storage/localDb';
+import { readDb, invalidate, flushPersist } from '../src/lib/storage/localDb';
 import { DB_KEY, normalizeDb, createEmptyDb } from '../src/lib/storage/schema';
 import * as logService from '../src/lib/services/logService';
 import * as statsService from '../src/lib/services/statsService';
@@ -16,7 +16,8 @@ const log = (id: string, name: string, kcal: number, iso: string): FoodEntry => 
   protein: 1, carbs: 2, fats: 3, sugar: 4, fiber: 5, createdAt: iso,
 });
 
-beforeEach(() => {
+beforeEach(async () => {
+  await flushPersist();
   resetStore();
   invalidate();
 });

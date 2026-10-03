@@ -39,6 +39,7 @@ interface NutritionDashboardProps {
   onUpdateFoodLog: (updatedEntry: FoodEntry) => Promise<void>;
   onClearAll: () => void;
   onCloseMobile?: () => void;
+  onOpenBackup: () => void;
 }
 
 const MACRO_META = [
@@ -65,6 +66,7 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
   onUpdateFoodLog,
   onClearAll,
   onCloseMobile,
+  onOpenBackup,
 }) => {
   const [activeTab, setActiveTab] = useState<'today' | 'history'>('today');
   /** Bumped on dismissal so the reminder re-evaluates instead of lingering. */
@@ -171,7 +173,11 @@ export const NutritionDashboard: React.FC<NutritionDashboardProps> = ({
             >
               {/* Only appears once there is a meaningful amount to lose. */}
               <motion.div variants={cardIn}>
-                <BackupReminder key={backupNudge} onDismissed={() => setBackupNudge((n) => n + 1)} />
+                <BackupReminder
+                  key={backupNudge}
+                  onDismissed={() => setBackupNudge((n) => n + 1)}
+                  onOpenBackup={onOpenBackup}
+                />
               </motion.div>
 
               {/* ── Hero: greeting + calorie ring ── */}

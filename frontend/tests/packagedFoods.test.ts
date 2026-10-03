@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { resetStore } from './setup';
 import * as dictionaryService from '../src/lib/services/dictionaryService';
 import * as localParser from '../src/lib/parsing/localParser';
-import { invalidate } from '../src/lib/storage/localDb';
+import { invalidate, flushPersist } from '../src/lib/storage/localDb';
 import { normalizeDb } from '../src/lib/storage/schema';
 import { getLocalIsoDate } from '../src/utils/date';
 import type { FoodEntry } from '../src/types';
@@ -24,7 +24,8 @@ const bread = () =>
     sugar: 3,
   });
 
-beforeEach(() => {
+beforeEach(async () => {
+  await flushPersist();
   resetStore();
   invalidate();
 });

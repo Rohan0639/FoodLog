@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { resetStore } from './setup';
-import { readDb, updateDb, invalidate } from '../src/lib/storage/localDb';
+import { readDb, updateDb, invalidate, loadStoredDb, flushPersist } from '../src/lib/storage/localDb';
+import { __setIterations } from '../src/lib/security/crypto';
+import { createVault, lockVault, openJson, isEnvelope } from '../src/lib/security/vault';
 import * as logService from '../src/lib/services/logService';
 import { getLocalIsoDate } from '../src/utils/date';
 
@@ -70,9 +72,20 @@ const connect = () =>
     meta: { ...db.meta, sync: { ...db.meta.sync, account: 'me@example.com' } },
   }));
 
-beforeEach(() => {
+/** What the last upload contained, decrypted, so assertions can read it. */
+const uploaded = async (): Promise<any> =>
+  isEnvelope(fakeDrive.content) ? openJson(fakeDrive.content) : fakeDrive.content;
+
+beforeEach(async () => {
+  // Let queued saves land first, so none of them writes into the next test.
+  await flushPersist();
   resetStore();
+  lockVault();
   invalidate();
+  // Sync only ever uploads ciphertext, so every test runs with an unlocked vault.
+  __setIterations(1000);
+  await createVault('correct horse battery');
+  await loadStoredDb();
   fakeDrive.file = null;
   fakeDrive.content = null;
   fakeDrive.calls = [];
@@ -96,7 +109,7 @@ describe('first sync', () => {
     const result = await syncService.sync();
     expect(result.ok).toBe(true);
     expect(fakeDrive.calls).toContain('create');
-    expect((fakeDrive.content as any).logs).toHaveLength(1);
+    expect((await uploaded()).logs).toHaveLength(1);
   });
 
   it('remembers the file so it is not searched for again', async () => {
@@ -166,7 +179,7 @@ describe('pull happens before push', () => {
     };
 
     await syncService.sync();
-    expect((fakeDrive.content as any).logs.map((l: any) => l.id).sort()).toEqual(['mine', 'theirs']);
+    expect((await uploaded()).logs.map((l: any) => l.id).sort()).toEqual(['mine', 'theirs']);
   });
 });
 
@@ -225,7 +238,7 @@ describe('failures never cost data', () => {
 
     expect(result.ok).toBe(true);
     expect(readDb().logs).toHaveLength(1);
-    expect((fakeDrive.content as any).logs).toHaveLength(1);
+    expect((await uploaded()).logs).toHaveLength(1);
   });
 });
 

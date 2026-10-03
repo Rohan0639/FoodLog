@@ -13,6 +13,9 @@ your browser, there are no accounts, and nothing you log is stored on a server.
 
 ## Features
 
+- **Private by design** — your diary is encrypted on your device with a
+  passphrase only you know. Sign in with Google to keep an encrypted copy in
+  your own Drive.
 - **Natural-language logging** — type a meal the way you'd text a friend. Items
   are separated on `and`, `,` and `+` (never `with`, so *"burger with cheese"*
   stays one dish).
@@ -32,15 +35,17 @@ your browser, there are no accounts, and nothing you log is stored on a server.
   chart, weekly average, and a per-day breakdown.
 - **Goals and preferences** — editable daily targets (calories, protein, carbs,
   fat, sugar, fiber), confetti on/off, and history chart length.
-- **Backup and restore** — export your whole diary to a JSON file and restore it
-  later. A gentle reminder appears once you have enough data and haven't backed
-  up recently.
+- **Encrypted backup and restore** — export your whole diary to a file sealed
+  with a passphrase you choose, and restore it later, on this or another device.
+  A reminder appears once you have enough data and haven't backed up recently.
 - **Optional Google Drive sync** — keep one diary across all your devices, stored
   in a private app-only folder in *your own* Google Drive. See
   [docs/SYNC_SETUP.md](docs/SYNC_SETUP.md).
 - **Works offline for everything except new text parsing** — logging, editing,
   history and stats are all local. Only phrases you have never logged before
   need the AI service.
+- **Clear save feedback** — if a change cannot be saved on the device, a banner
+  says so.
 
 ---
 
@@ -200,20 +205,28 @@ authorised origin in the Google Cloud console.
 
 ## Privacy
 
-- Your diary is stored in your browser's local storage on your device.
-- The only data sent to a server is the **text of the meal you are parsing** (and
-  a label photo, if you attach one). It is not linked to an account, because
-  there are no accounts. Nothing is kept on the server beyond a short-lived
-  in-memory cache.
-- If you turn on Drive sync, your diary is stored in a private app-only folder
-  in your own Google Drive. The app's access is limited to that folder.
-
----
+- **Encrypted on the device.** The diary is encrypted with AES-256-GCM. The key
+  is derived in your browser from a passphrase you choose (PBKDF2, 600,000
+  iterations). The passphrase is never stored or sent anywhere, and the key is
+  held only in memory, so you enter the passphrase again on each visit.
+- **Sign-in and sync use your own Google Drive.** When sync is configured, you
+  sign in with Google, and the encrypted diary is stored in a private app folder
+  in your Drive. The app's access is limited to that folder, and Google only
+  ever sees ciphertext.
+- **Backups are encrypted too.** Each backup has its own salt and is sealed with
+  a passphrase you enter at export. Restoring needs that passphrase.
+- **The server stores nothing.** The only data sent to the server is the text of
+  the meal being parsed (and a label photo, if you attach one). There are no
+  accounts on the server and no database.
+- **A forgotten passphrase cannot be recovered.** Nothing else holds a decryptable
+  copy, so keep your passphrases somewhere safe.
 
 ## Limitations
 
-- **Data lives in one browser.** Clearing site data erases the diary unless you
-  have exported a backup or turned on Drive sync.
+- **Data lives on one device until you sync or export.** Clearing site data
+  erases the local copy. Keep Drive sync on or export regular encrypted backups.
+- **Passphrase recovery is not possible.** A lost passphrase makes the local
+  copy, the Drive copy, and any backup unreadable.
 - **Server rate limiting is per instance.** It guards against casual abuse, not
   a determined attacker. A distributed limiter would be the next step for
   production use.
@@ -231,6 +244,8 @@ authorised origin in the Google Cloud console.
 - CSV and PDF reports
 - Installable PWA and home-screen widget
 - Favourites UI (the data layer already exists)
+- Recovery codes for lost passphrases
+- Move local storage to IndexedDB for larger histories
 
 ---
 
