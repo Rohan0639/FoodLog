@@ -77,6 +77,19 @@ export async function unlockVault(passphrase: string): Promise<void> {
   key = derived;
 }
 
+/**
+ * Uses a key that is already held elsewhere, such as the per-browser device key.
+ * The key itself is never exported.
+ */
+export function adoptKey(newKey: CryptoKey): void {
+  key = newKey;
+}
+
+/** Whether this session holds the key, whichever way it was obtained. */
+export function hasKey(): boolean {
+  return key !== null;
+}
+
 /** Forgets the key. The diary becomes unreadable until the passphrase is entered again. */
 export function lockVault(): void {
   key = null;

@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Lock, ShieldCheck, Cloud } from 'lucide-react';
+import { Lock, UserRound } from 'lucide-react';
 import { createVault, unlockVault } from '../lib/security/vault';
 import { loadStoredDb } from '../lib/storage/localDb';
-import * as syncService from '../lib/sync/syncService';
+import { ApiError } from '../services/api/client';
+import * as authApi from '../services/api/authApi';
 import { Button, Card } from '../ui/primitives';
 
 /**
@@ -101,49 +102,116 @@ export const VaultGate: React.FC<{ mode: 'setup' | 'unlock'; onReady: () => void
 };
 
 /**
- * Requires a Google account before the diary opens. The account is only used to
- * reach the user's own private Drive folder, where the encrypted copy is kept.
+ * Signs the user in to their FoodLog account, or creates one. The session cookie
+ * is set by the server and is httpOnly, so scripts on the page cannot read it.
  */
-export const SignInGate: React.FC<{ onSignedIn: () => void }> = ({ onSignedIn }) => {
+export const AccountGate: React.FC<{ onSignedIn: () => void }> = ({ onSignedIn }) => {
+  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
-  const [note, setNote] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
+  // Already signed in from an earlier visit: go straight through.
   useEffect(() => {
-    // Silent attempt first: an already-authorised user goes straight through.
     let cancelled = false;
-    syncService.resume().finally(() => {
-      if (!cancelled && syncService.isSignedIn()) onSignedIn();
-    });
+    authApi
+      .currentUser()
+      .then((user) => {
+        if (!cancelled && user) onSignedIn();
+      })
+      .catch(() => {
+        // Server unreachable: stay on the form, which will show the error on submit.
+      });
     return () => {
       cancelled = true;
     };
   }, [onSignedIn]);
 
-  const signIn = async () => {
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (busy) return;
     setBusy(true);
-    setNote(null);
-    const result = await syncService.signIn();
-    setBusy(false);
-    if (result.ok) onSignedIn();
-    else setNote(result.error ?? 'Sign-in failed. Try again.');
+    setError(null);
+    try {
+      if (mode === 'register') await authApi.register({ email, name, password });
+      else await authApi.login({ email, password });
+      onSignedIn();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Something went wrong. Please try again.');
+    } finally {
+      setBusy(false);
+    }
   };
+
+  const isRegister = mode === 'register';
 
   return (
     <div className="h-dvh w-full flex items-center justify-center px-6">
-      <Card className="max-w-sm w-full p-7 text-center">
+      <Card className="max-w-sm w-full p-7">
         <div className="w-14 h-14 rounded-3xl grad-tile flex items-center justify-center mx-auto mb-4">
-          <ShieldCheck className="w-6 h-6" />
+          <UserRound className="w-6 h-6" />
         </div>
-        <h2 className="text-lg font-extrabold text-fg-strong">Sign in to continue</h2>
-        <p className="text-sm text-fg-muted font-semibold mt-2 mb-5 leading-relaxed">
-          Your encrypted diary is kept in a private folder in your own Google Drive. FoodLog cannot
-          read it, and it cannot see anything else in your Drive.
+        <h2 className="text-lg font-extrabold text-fg-strong text-center">
+          {isRegister ? 'Create your account' : 'Sign in'}
+        </h2>
+        <p className="text-sm text-fg-muted font-semibold mt-2 mb-5 text-center leading-relaxed">
+          Your account lets FoodLog remember the foods you eat, so repeat meals are recognised without
+          waiting for the AI.
         </p>
-        <Button variant="primary" size="md" fullWidth onClick={signIn} disabled={busy}>
-          <Cloud className="w-4 h-4" />
-          {busy ? 'Connecting…' : 'Sign in with Google'}
-        </Button>
-        {note && <p className="text-[11px] font-bold text-accent mt-3">{note}</p>}
+
+        <form onSubmit={submit} className="space-y-3">
+          {isRegister && (
+            <input
+              type="text"
+              autoComplete="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Your name"
+              aria-label="Your name"
+              className="field text-sm w-full"
+              required
+            />
+          )}
+          <input
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Email"
+            aria-label="Email"
+            className="field text-sm w-full"
+            required
+          />
+          <input
+            type="password"
+            autoComplete={isRegister ? 'new-password' : 'current-password'}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Password (8+ characters)"
+            aria-label="Password"
+            className="field text-sm w-full"
+            required
+          />
+
+          {error && <p role="alert" className="text-[11px] font-bold text-accent">{error}</p>}
+
+          <Button type="submit" variant="primary" size="md" fullWidth disabled={busy}>
+            {busy ? 'Please wait…' : isRegister ? 'Create account' : 'Sign in'}
+          </Button>
+        </form>
+
+        <button
+          type="button"
+          onClick={() => {
+            setMode(isRegister ? 'login' : 'register');
+            setError(null);
+          }}
+          className="w-full text-center text-[11px] font-extrabold text-fg-dim hover:text-fg-base mt-4"
+        >
+          {isRegister ? 'Already have an account? Sign in' : 'New here? Create an account'}
+        </button>
       </Card>
     </div>
   );
