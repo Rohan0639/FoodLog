@@ -61,9 +61,21 @@ export function isStorageAvailable(): boolean {
   }
 }
 
-/** True when the diary is protected by a vault this session has not unlocked. */
+/**
+ * True when the stored diary is encrypted and this session does not hold its key.
+ * Checks the stored data as well as the vault header, so an encrypted diary is
+ * never overwritten with an empty one.
+ */
 export function isLocked(): boolean {
-  return hasVault() && !isUnlocked();
+  if (isUnlocked()) return false;
+  if (hasVault()) return true;
+  const raw = readRaw();
+  if (!raw) return false;
+  try {
+    return isEnvelope(JSON.parse(raw));
+  } catch {
+    return false;
+  }
 }
 
 /** Resolves once every queued save has reached storage. */

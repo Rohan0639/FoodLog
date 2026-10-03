@@ -4,7 +4,9 @@ import { Apple, Lock } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import { runLegacyMigration } from './lib/migration/legacyMigration';
 import { isStorageAvailable } from './lib/storage/localDb';
-import { hasVault, isUnlocked } from './lib/security/vault';
+import { adoptKey, hasVault, isUnlocked } from './lib/security/vault';
+import { getOrCreateDeviceKey } from './lib/security/deviceKey';
+import { loadStoredDb } from './lib/storage/localDb';
 import { profileService } from './lib/services';
 import { VaultGate, AccountGate } from './components/AccessGate';
 import { Blobs, Card } from './ui/primitives';
@@ -13,22 +15,42 @@ import { spring } from './ui/motion';
 /**
  * Startup order, each step gating the next:
  *   1. storage must work
- *   2. the diary must be unlocked with the user's passphrase (created on first use)
+ *   2. the diary is unlocked: a legacy passphrase vault if one exists, otherwise
+ *      this browser's device key (created silently on first use)
  *   3. the user must be signed in to their FoodLog account
  *   4. the one-time Supabase import runs, then the dashboard opens
  */
-type Phase = 'blocked' | 'setup' | 'unlock' | 'account' | 'booting' | 'ready';
+type Phase = 'blocked' | 'device' | 'unlock' | 'account' | 'booting' | 'ready';
 
 function initialPhase(): Phase {
   if (!isStorageAvailable()) return 'blocked';
   if (isUnlocked()) return 'account';
-  return hasVault() ? 'unlock' : 'setup';
+  return hasVault() ? 'unlock' : 'device';
 }
 
 export default function App() {
   const [phase, setPhase] = useState<Phase>(initialPhase);
 
   const afterVault = useCallback(() => setPhase('account'), []);
+  const [deviceError, setDeviceError] = useState<string | null>(null);
+
+  // No passphrase: open the diary with this browser's device key.
+  useEffect(() => {
+    if (phase !== 'device') return;
+    let cancelled = false;
+    getOrCreateDeviceKey()
+      .then(async (key) => {
+        adoptKey(key);
+        await loadStoredDb();
+        if (!cancelled) setPhase('account');
+      })
+      .catch((err) => {
+        if (!cancelled) setDeviceError(err instanceof Error ? err.message : 'Could not open your diary.');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [phase]);
   const afterAccount = useCallback(() => setPhase('booting'), []);
 
   useEffect(() => {
@@ -65,11 +87,24 @@ export default function App() {
     );
   }
 
-  if (phase === 'setup' || phase === 'unlock') {
+  if (phase === 'device') {
+    return (
+      <div className="h-dvh w-full flex flex-col items-center justify-center gap-4 px-6">
+        <Blobs />
+        {deviceError ? (
+          <p role="alert" className="text-sm font-bold text-accent text-center max-w-sm">{deviceError}</p>
+        ) : (
+          <p className="text-sm text-fg-dim font-bold">Getting your diary ready…</p>
+        )}
+      </div>
+    );
+  }
+
+  if (phase === 'unlock') {
     return (
       <>
         <Blobs />
-        <VaultGate mode={phase} onReady={afterVault} />
+        <VaultGate mode="unlock" onReady={afterVault} />
       </>
     );
   }
