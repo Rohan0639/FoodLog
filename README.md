@@ -80,7 +80,7 @@ Two design choices drive most of this:
             Browser (React, Vite)
                   │  /api/* (same origin, session cookie)
                   ▼
-        Vercel: api/index.ts  ──►  Express app (server/)
+        Vercel: api/index.py  ──►  FastAPI app (backend/)
                                      ├─ auth      register · login · logout · me
                                      ├─ parsing   saved foods → Gemini → validation
                                      └─ health    /api/health, /api/health/db
@@ -91,8 +91,8 @@ Two design choices drive most of this:
                schema foodlog_app                       dictionary, Drive sync)
 ```
 
-The server stores accounts and saved foods. It does not store diary entries
-yet. Those stay encrypted on the device.
+The backend is Python. The server stores accounts and saved foods. It does not
+store diary entries yet. Those stay encrypted on the device.
 
 ---
 
@@ -101,14 +101,15 @@ yet. Those stay encrypted on the device.
 | Area | Tools |
 |---|---|
 | Frontend | React 19, TypeScript, Vite 8, Tailwind CSS 3, Framer Motion, Lucide, canvas-confetti |
-| Server | Node.js, Express 5, TypeScript, Zod validation |
-| Auth | Argon2id (password hashing), JWT in an httpOnly cookie |
-| Database | PostgreSQL on Supabase, accessed through Prisma 7 (`foodlog_app` schema) |
-| AI | Google Gemini (`gemini-3.1-flash-lite`), called only from the server |
+| Backend | Python 3.12+, FastAPI, Pydantic validation |
+| Auth | Argon2id (password hashing), PyJWT, session in an httpOnly cookie |
+| Database | PostgreSQL on Supabase, accessed via `psycopg` (no ORM; `foodlog_app` schema) |
+| AI | Google Gemini (`gemini-3.1-flash-lite`), called only from the backend (`httpx`) |
 | On-device storage | Browser `localStorage`, encrypted with AES-256-GCM |
 | Sync (optional) | Google Identity Services (OAuth 2.0), Google Drive `appdata` scope |
-| Testing | Vitest, Supertest (server), Vitest (frontend logic) |
-| Hosting | Vercel (frontend and the `/api` function) |
+| Testing | pytest (backend: API, parsing, live database), Vitest (frontend logic) |
+| Hosting | Vercel (frontend static build + the Python `/api` function) |
+| Migrations | Prisma CLI (`prisma/`), used only as a schema/migration tool — not a runtime dependency |
 
 ---
 
@@ -117,33 +118,34 @@ yet. Those stay encrypted on the device.
 ```
 foodlog/
 ├── api/
-│   └── index.ts                 # Vercel entry: every /api/* request goes to the Express app
-├── server/
-│   ├── src/
-│   │   ├── app.ts               # Express app: middleware, routes, error handling
-│   │   ├── server.ts            # Local server entry (npm run server:start)
-│   │   ├── config/env.ts        # Validated environment variables
-│   │   ├── db/client.ts         # Prisma client (PostgreSQL adapter)
-│   │   ├── middleware/          # Session check, error envelope
-│   │   ├── modules/
-│   │   │   ├── auth/            # Registration, login, sessions
-│   │   │   └── parsing/         # Saved-food lookup, Gemini parser, label route
-│   │   └── utils/logger.ts      # JSON logs with secrets redacted
-│   └── tests/                   # Server tests (API, parsing, database)
+│   └── index.py                 # Vercel entry: every /api/* request goes to the FastAPI app
+├── backend/
+│   ├── requirements.txt
+│   ├── app/
+│   │   ├── main.py              # FastAPI app: middleware, routes, error handling
+│   │   ├── server.py            # Local dev entry (python backend/app/server.py)
+│   │   ├── config.py            # Validated environment variables
+│   │   ├── db.py                # psycopg connection pool (no ORM)
+│   │   ├── errors.py            # ApiError + the {success, error} envelope
+│   │   ├── logging_utils.py     # JSON logs with secrets redacted
+│   │   ├── security/auth.py     # Argon2id hashing, JWT sign/verify
+│   │   └── modules/
+│   │       ├── auth/            # Registration, login, sessions
+│   │       └── parsing/         # Saved-food lookup, Gemini client, validator, label route
+│   └── tests/                   # pytest: API, parsing, database
 ├── prisma/
 │   ├── schema.prisma            # Users, food logs, items, goals, favourites, food dictionary
-│   └── migrations/              # Applied to Supabase
-├── backend/                     # Existing parsing code: Gemini client, validator, label reader
-├── shared/                      # Types and text normalisation
+│   └── migrations/              # Applied to Supabase; the source of truth for the schema
 ├── frontend/
 │   ├── src/
-│   │   ├── App.tsx              # Start-up: passphrase → account → dashboard
+│   │   ├── App.tsx              # Start-up: device key/passphrase → account → dashboard
 │   │   ├── components/          # Gates, chat, review table, dashboard, history, settings
-│   │   ├── services/api/        # Typed client for the server (auth, errors)
+│   │   ├── services/api/        # Typed client for the backend (auth, errors)
 │   │   ├── lib/                 # Storage, encryption, parsing, sync, migration
 │   │   └── ...
 │   └── tests/                   # Frontend logic tests
 ├── docs/                        # Setup guides and design notes
+├── requirements.txt              # Points Vercel's Python builder at backend/requirements.txt
 └── vercel.json                  # Build, function and rewrite settings
 ```
 
@@ -153,15 +155,19 @@ foodlog/
 
 ### Prerequisites
 
-- Node.js 18 or newer
+- Node.js 18 or newer (frontend, and the Prisma CLI used only for migrations)
+- Python 3.12 or newer (backend)
 - A PostgreSQL database. This project uses [Supabase](https://supabase.com/)
 - A Google Gemini API key from [Google AI Studio](https://aistudio.google.com/)
 
 ### 1. Install
 
 ```bash
-npm install --legacy-peer-deps
 npm install --prefix frontend
+
+python -m venv .venv
+.venv\Scripts\activate        # Windows; use `source .venv/bin/activate` on macOS/Linux
+pip install -r backend/requirements.txt
 ```
 
 ### 2. Configure
@@ -174,14 +180,14 @@ cp .env.example .env
 
 | Variable | Where | What it is |
 |---|---|---|
-| `DATABASE_URL` | root `.env` | PostgreSQL connection string. For Supabase, use the **Session pooler** string and add `?schema=foodlog_app` |
+| `DATABASE_URL` | root `.env` | PostgreSQL connection string. For Supabase, use the **Session pooler** string and add `?schema=foodlog_app`. The `?schema=` parameter is stripped before connecting and applied as `search_path` instead, since `psycopg`/libpq (unlike Node's `pg`) rejects unrecognised query parameters |
 | `JWT_SECRET` | root `.env` | At least 32 random characters, used to sign login sessions |
-| `GEMINI_API_KEY` | root `.env` | Your Gemini key. Used only on the server |
+| `GEMINI_API_KEY` | root `.env` | Your Gemini key. Used only on the backend |
 | `CORS_ORIGIN` | root `.env` | Frontend origin allowed to call the API (default `http://localhost:5173`) |
 | `PORT` | root `.env` | Local API port (default `8787`) |
 | `VITE_GOOGLE_CLIENT_ID` | `frontend/.env` | Only for Google Drive sync. See [docs/SYNC_SETUP.md](docs/SYNC_SETUP.md) |
 
-Generate a `JWT_SECRET` with: `node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"`
+Generate a `JWT_SECRET` with: `python -c "import secrets; print(secrets.token_urlsafe(48))"`
 
 ### 3. Set up the database
 
@@ -194,11 +200,11 @@ npm run db:deploy        # applies the migrations to your database
 Two terminals, both from the project root:
 
 ```bash
-npm run server:start     # API on http://localhost:8787
-npm run dev              # app on http://localhost:5173 (proxies /api to the API)
+python backend/app/server.py     # API on http://localhost:8787
+npm run dev                      # app on http://localhost:5173 (proxies /api to the API)
 ```
 
-Open http://localhost:5173, set a passphrase, create an account, and log a meal.
+Open http://localhost:5173, create an account, and log a meal.
 
 ---
 
@@ -206,19 +212,19 @@ Open http://localhost:5173, set a passphrase, create an account, and log a meal.
 
 | Command | What it does |
 |---|---|
-| `npm run server:start` | Start the API server |
-| `npm run server:dev` | Start the API server and reload on changes |
+| `python backend/app/server.py` | Start the API server (`--reload`-free; re-run after changes) |
+| `uvicorn backend.app.server:app --reload --port 8787` | Start the API server with auto-reload |
 | `npm run dev` | Start the frontend (port 5173) |
-| `npm run test:server` | Run the server tests (API, parsing, database) |
-| `npm run test:db` | Run only the database tests |
-| `npm run db:deploy` | Apply database migrations |
+| `pytest backend/tests` | Run the backend tests (API, parsing, database) |
+| `pytest backend/tests -k database` | Run only the database tests |
+| `npm run db:deploy` | Apply database migrations (via the Prisma CLI) |
 | `npm run db:migrate` | Create and apply a new migration in development |
-| `npm run db:generate` | Regenerate the Prisma client |
 | `npm run build --prefix frontend` | Type-check and build the frontend |
 | `cd frontend && npx vitest run` | Run the frontend tests |
 
-Server tests use your real database and delete the rows they create. Point
-`DATABASE_URL` at a development project, not production data.
+Backend tests use your real database and delete the rows they create. Point
+`DATABASE_URL` at a development project, not production data. Tests that need
+the database are skipped automatically when `DATABASE_URL` isn't set.
 
 ---
 
@@ -237,9 +243,10 @@ The live site is deployed on Vercel. To deploy your own copy:
    Add `CORS_ORIGIN` as your deployed URL if you need it.
 4. Deploy: `npx vercel --prod --yes`
 
-`vercel.json` installs the server's dependencies, generates the Prisma client,
-builds the frontend, and sends every `/api/*` request to `api/index.ts`. Other
-paths fall back to `index.html`.
+`vercel.json` builds the frontend and sends every `/api/*` request to
+`api/index.py`, a Python (FastAPI) serverless function. Vercel's Python builder
+installs from the root `requirements.txt`, which points at
+`backend/requirements.txt`. Other paths fall back to `index.html`.
 
 To check a deployment: `/api/health` should return `{"success":true,...}`, and
 `/api/health/db` should return `"database":"ok"`.
@@ -301,7 +308,17 @@ Notes:
 
 ## Status
 
-The core features work end to end: accounts, passphrase protection, food logging
-through the server with saved-food reuse, label photos, history, backup, and
+The core features work end to end: accounts, on-device encryption, food logging
+through the backend with saved-food reuse, label photos, history, backup, and
 optional Drive sync. The app is a personal project and has not been audited for
 production use.
+
+**Backend rewrite:** the API was rewritten from Node/Express/TypeScript to
+Python/FastAPI, on the `feature/python-backend` branch. The response shapes,
+routes, auth flow, saved-food caching and the Gemini prompts are unchanged, so
+the frontend works against either backend without modification. It has been
+verified with the full pytest suite (API, parsing, live database) and against
+the live Supabase database and a real Gemini call, both directly and through
+the frontend's dev proxy. It has not yet been deployed to Vercel's Python
+runtime or re-verified end to end in a browser — the live site above still runs
+the previous Node backend until that happens.

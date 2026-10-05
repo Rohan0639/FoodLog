@@ -5,9 +5,9 @@ import path from 'node:path'
 const repoRoot = path.resolve(__dirname, '..')
 
 /**
- * In development, `/api/*` is forwarded to the Express server (server/), so the
+ * In development, `/api/*` is forwarded to the Python API (backend/), so the
  * browser sees one origin and the session cookie works without CORS changes.
- * Start the server with `npm run server:dev` first.
+ * Start the server with `python backend/app/server.py` first.
  */
 const apiTarget = process.env.API_TARGET ?? 'http://localhost:8787'
 

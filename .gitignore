@@ -42,5 +42,12 @@ backend/.env.*.local
 
 
 
-# Generated Prisma client
+
+# Python backend
+.venv*/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
 server/generated/
+server/
